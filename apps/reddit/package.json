@@ -1,0 +1,16 @@
+{
+  "name": "reddit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"pnpm --filter reddit-client dev\" \"pnpm --filter reddit-server dev\"",
+    "client-build": "pnpm --filter reddit-client build",
+    "server-build": "pnpm --filter reddit-server build",
+    "build": "pnpm client-build && pnpm server-build",
+    "clean": "pnpm --filter reddit-client clean && pnpm --filter reddit-server clean"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

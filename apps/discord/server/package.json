@@ -1,0 +1,23 @@
+{
+  "name": "discord-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node ../../dist/discord/server/server.js",
+    "clean": "rm -rf ../../dist/discord/server"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.19.7",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "discord-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@discord/embedded-app-sdk": "^1.0.1",
+    "@repo/game-core": "workspace:*",
+    "@repo/platform-discord": "workspace:*",
+    "pixi.js": "^8.8.0"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "typescript": "^5.7.3",
+    "vite": "^5.0.8"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "extends": "@repo/typescript-config/client.json",
+  "compilerOptions": {
+    "outDir": "../../dist/discord/client",
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["dist", "node_modules"]
+}

@@ -1,0 +1,28 @@
+{
+  "name": "pixi-game-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "dev:fb": "turbo run dev --filter=fb-instant",
+    "build:fb": "turbo run build --filter=fb-instant",
+    "dev:reddit": "turbo run dev --filter=reddit...",
+    "build:reddit": "turbo run build --filter=reddit...",
+    "dev:discord": "turbo run dev --filter=discord...",
+    "build:discord": "turbo run build --filter=discord...",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=22.2.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

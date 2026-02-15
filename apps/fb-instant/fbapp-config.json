@@ -1,0 +1,14 @@
+{
+  "instant_games": {
+    "platform_version": "RICH_GAMEPLAY",
+    "orientation": "LANDSCAPE",
+    "navigation_menu_version": "NAV_BAR",
+    "navigation_menu_config": {
+      "image_generator_config": {
+        "text_color": "#FFFFFF",
+        "background_color": "#00ff88",
+        "text": "Play Now!"
+      }
+    }
+  }
+}
