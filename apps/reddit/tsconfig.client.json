@@ -1,0 +1,9 @@
+{
+  "extends": "@repo/typescript-config/client.json",
+  "compilerOptions": {
+    "outDir": "./dist/client",
+    "rootDir": "./src/client"
+  },
+  "include": ["src/client/**/*"],
+  "references": [{ "path": "../../packages/typescript-config" }]
+}

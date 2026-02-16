@@ -18,6 +18,13 @@ function copyFBConfig() {
 
 export default defineConfig({
   plugins: [basicSsl(), copyFBConfig()],
+  resolve: {
+    alias: {
+      '@repo/game-core': resolve(__dirname, '../../packages/game-core/src'),
+      '@repo/platform-fb': resolve(__dirname, '../../packages/platform-fb/src'),
+      '@repo/shared': resolve(__dirname, '../../packages/shared/src'),
+    },
+  },
   base: './',
   server: {
     port: 3000,

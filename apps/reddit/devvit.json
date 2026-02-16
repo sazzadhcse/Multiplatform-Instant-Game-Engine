@@ -1,6 +1,6 @@
 {
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
-  "name": "pixi-game-reddit",
+  "name": "treasure-solitre",
   "post": {
     "dir": "dist/client",
     "entrypoints": {
@@ -21,7 +21,7 @@
     "items": [
       {
         "label": "Create a new post",
-        "description": "PixiJS Game",
+        "description": "treasure-solitre",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/post-create"
@@ -39,6 +39,6 @@
     "dev": "vite build --watch"
   },
   "dev": {
-    "subreddit": "pixi_game_dev"
+    "subreddit": "treasure_solitre_dev"
   }
 }

@@ -13,17 +13,32 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Create and initialize game with Discord platform
-  const game = new Game({
-    platform,
-  });
+  // Fallback: remove loading screen after 8 seconds max
+  const loadingTimeout = setTimeout(() => {
+    document.getElementById("loading")?.remove();
+    console.warn("Loading screen removed by timeout");
+  }, 8000);
 
-  await game.init();
+  try {
+    // Create and initialize game with Discord platform
+    const game = new Game({
+      platform,
+    });
 
-  // Hide loading screen
-  document.getElementById("loading")?.remove();
+    await game.init();
 
-  console.log("Discord game started!");
+    // Clear the timeout since init completed
+    clearTimeout(loadingTimeout);
+
+    // Hide loading screen
+    document.getElementById("loading")?.remove();
+
+    console.log("Discord game started!");
+  } catch (e) {
+    console.error("Game init failed:", e);
+    // Still remove loading screen on error
+    document.getElementById("loading")?.remove();
+  }
 }
 
 // Initialize game when page loads

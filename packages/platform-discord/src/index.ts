@@ -1,32 +1,13 @@
 import type { PlatformAPI } from "@repo/shared";
-import { DiscordSDK, type DiscordSdk } from "@discord/embedded-app-sdk";
 
-declare global {
-  interface Window {
-    DiscordSDKMock?: {
-      commands: {
-        authenticate(_token: string): { user: { username: string } };
-        getChannel(): { id: string };
-        getGuilds(): { id: string }[];
-      };
-    };
-  }
-}
+// Dynamic import to avoid build issues
+let DiscordSDK: any = null;
 
-/**
- * Mock DiscordSDK for development outside Discord
- */
-class DiscordSDKMock implements Partial<DiscordSdk> {
-  commands = {
-    authenticate: (_token: string) =>
-      Promise.resolve({
-        user: { username: "MockUser" + Math.floor(Math.random() * 1000) },
-        application: { id: "mock-app-id" },
-      }),
-    getChannel: () =>
-      Promise.resolve({ id: "mock-channel-id", name: "mock-channel" }),
-    getGuilds: () => Promise.resolve([{ id: "mock-guild-id" }]),
-  };
+try {
+  const sdkModule = await import("@discord/embedded-app-sdk");
+  DiscordSDK = sdkModule.DiscordSDK;
+} catch (e) {
+  console.warn("Discord SDK not available, using mock");
 }
 
 function detectDiscordContext(): boolean {
@@ -35,54 +16,79 @@ function detectDiscordContext(): boolean {
   return params.has("frame_id");
 }
 
-function getDiscordSDK(): DiscordSdk | DiscordSDKMock {
-  if (detectDiscordContext()) {
-    return new DiscordSDK({
-      clientId: import.meta.env.VITE_DISCORD_CLIENT_ID || "",
-    });
-  }
-  return new DiscordSDKMock() as unknown as DiscordSdk;
-}
+/**
+ * Mock SDK for development/local testing
+ */
+const createMockSDK = () => ({
+  commands: {
+    authenticate: async () => ({
+      user: {
+        username: "Guest" + Math.floor(Math.random() * 1000),
+        discriminator: "0",
+        id: "guest_" + Math.random().toString(36).slice(2),
+        avatar: null,
+      },
+      application: { id: "mock-app" },
+    }),
+    getChannel: async () => ({ id: "mock-channel", name: "Mock Channel" }),
+    getGuilds: async () => [{ id: "mock-guild" }],
+  },
+});
 
 export class DiscordPlatform implements PlatformAPI {
-  private sdk: DiscordSdk | DiscordSDKMock;
+  private sdk: any = null;
   private initialized = false;
-  private playerId = "local_discord_player";
-  private playerName = "DiscordUser";
+  private playerId = "local_player";
+  private playerName = "Player";
   private locale = "en";
-  private auth = {
-    accessToken: "",
-    user: { username: "", discriminator: "", id: "" },
-  };
 
   constructor() {
-    this.sdk = getDiscordSDK();
+    // Initialize SDK if available
+    if (DiscordSDK && detectDiscordContext()) {
+      try {
+        this.sdk = new DiscordSDK({
+          clientId: (import.meta.env as any).VITE_DISCORD_CLIENT_ID || "",
+        });
+      } catch (e) {
+        console.warn("Failed to initialize Discord SDK:", e);
+        this.sdk = createMockSDK();
+      }
+    } else {
+      this.sdk = createMockSDK();
+    }
   }
 
   async initialize(): Promise<void> {
+    if (this.initialized) return;
     if (typeof window === "undefined") return;
 
-    try {
-      // Authenticate with Discord
-      this.auth = (await this.sdk.commands.authenticate(
-        import.meta.env.VITE_DISCORD_ACCESS_TOKEN || ""
-      )) as typeof this.auth;
+    // Set default locale first
+    this.locale = navigator.language?.split("-")[0] || "en";
 
-      this.playerName =
-        this.auth.user.username +
-          (this.auth.user.discriminator && this.auth.user.discriminator !== "0"
-            ? `#${this.auth.user.discriminator}`
-            : "") || "DiscordUser";
-      this.playerId = this.auth.user.id || "discord_user";
-
+    // Skip SDK auth if no SDK available
+    if (!this.sdk || !this.sdk.commands) {
+      this.playerName = "Guest Player";
+      this.playerId = "guest_" + Math.random().toString(36).slice(2);
       this.initialized = true;
+      return;
+    }
+
+    try {
+      const auth = await this.sdk.commands.authenticate(
+        (import.meta.env as any).VITE_DISCORD_ACCESS_TOKEN || ""
+      );
+
+      if (auth?.user) {
+        this.playerName = auth.user.username || "Player";
+        this.playerId = auth.user.id || this.playerId;
+      }
     } catch (e) {
-      console.warn("Discord authentication failed:", e);
-      this.playerName = "GuestPlayer";
+      console.warn("Discord auth failed, using defaults:", e);
+      this.playerName = "Guest Player";
       this.playerId = "guest_" + Math.random().toString(36).slice(2);
     }
 
-    this.locale = navigator.language?.split("-")[0] || "en";
+    this.initialized = true;
   }
 
   getPlayerId(): string {
@@ -98,11 +104,20 @@ export class DiscordPlatform implements PlatformAPI {
   }
 
   async setData(key: string, value: string): Promise<void> {
-    localStorage.setItem(`discord_${key}`, value);
+    try {
+      localStorage.setItem(`discord_${key}`, value);
+    } catch (e) {
+      console.warn("Failed to save data:", e);
+    }
   }
 
   async getData(key: string): Promise<string | null> {
-    return localStorage.getItem(`discord_${key}`);
+    try {
+      return localStorage.getItem(`discord_${key}`);
+    } catch (e) {
+      console.warn("Failed to load data:", e);
+      return null;
+    }
   }
 
   setLoadingProgress(_percent: number): void {
@@ -110,30 +125,15 @@ export class DiscordPlatform implements PlatformAPI {
   }
 
   async startGame(): Promise<void> {
-    // No-op for Discord - game starts immediately after auth
+    // No-op for Discord
   }
 
-  async updateScore(score: number): Promise<void> {
-    // Update Discord activity
-    try {
-      // Discord SDK doesn't have native score tracking
-      // Could use activity updates if needed
-      console.log("Discord score updated:", score);
-    } catch (e) {
-      console.warn("Failed to update Discord activity:", e);
-    }
+  async updateScore(_score: number): Promise<void> {
+    // Discord activity updates can be added here if needed
   }
 
   isPlatformContext(): boolean {
     return detectDiscordContext();
-  }
-
-  getSDK(): DiscordSdk | DiscordSDKMock {
-    return this.sdk;
-  }
-
-  getAuth() {
-    return this.auth;
   }
 }
 

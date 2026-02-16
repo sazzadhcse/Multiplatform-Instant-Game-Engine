@@ -5,12 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"pnpm --filter discord-client dev\" \"pnpm --filter discord-server dev\"",
+    "dev:no-tunnel": "concurrently \"pnpm --filter discord-client dev\" \"pnpm --filter discord-server dev\"",
+    "tunnel": "cloudflared tunnel --url http://localhost:5173",
     "client-build": "pnpm --filter discord-client build",
     "server-build": "pnpm --filter discord-server build",
     "build": "pnpm client-build && pnpm server-build",
     "clean": "pnpm --filter discord-client clean && pnpm --filter discord-server clean"
   },
   "devDependencies": {
+    "cloudflared": "^0.5.3",
     "concurrently": "^9.1.2"
   }
 }

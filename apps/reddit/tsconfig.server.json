@@ -1,0 +1,11 @@
+{
+  "extends": "@repo/typescript-config/server.json",
+  "compilerOptions": {
+    "outDir": "./dist/server",
+    "rootDir": "./src/server",
+    "module": "CommonJS",
+    "moduleResolution": "node"
+  },
+  "include": ["src/server/**/*"],
+  "references": [{ "path": "../../packages/typescript-config" }]
+}

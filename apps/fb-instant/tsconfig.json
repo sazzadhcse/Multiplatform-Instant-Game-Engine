@@ -2,7 +2,11 @@
   "extends": "@repo/typescript-config/client.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "paths": {
+      "@repo/game-core": ["../../packages/game-core/src"],
+      "@repo/platform-fb": ["../../packages/platform-fb/src"],
+      "@repo/shared": ["../../packages/shared/src"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["dist", "node_modules"]

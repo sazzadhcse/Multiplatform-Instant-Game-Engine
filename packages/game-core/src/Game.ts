@@ -1,3 +1,4 @@
+import 'pixi.js/unsafe-eval';
 import { Application, Container, Graphics, Text, Ticker } from "pixi.js";
 import type { PlatformAPI } from "@repo/shared";
 
@@ -23,6 +24,16 @@ interface CoinConfig {
   radius: number;
   color: number;
   value: number;
+}
+
+// Helper: Promise with timeout
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(message)), ms)
+    ),
+  ]);
 }
 
 /**
@@ -78,64 +89,107 @@ export class Game {
    * Initialize the game
    */
   async init(): Promise<void> {
-    // Wait for platform initialization
-    await this.platform.initialize();
+    try {
+      // Wait for platform initialization (with timeout)
+      await withTimeout(
+        this.platform.initialize(),
+        3000,
+        "Platform init timeout"
+      ).catch(() => {
+        console.warn("Platform init timed out, using defaults");
+      });
 
-    // Get canvas dimensions
-    const width = window.innerWidth;
-    const height = window.innerHeight;
+      console.log("Platform initialized:", {
+        playerId: this.platform.getPlayerId(),
+        playerName: await Promise.race([
+          this.platform.getPlayerName(),
+          Promise.resolve("Player")
+        ]),
+        locale: this.platform.getLocale(),
+      });
 
-    // Initialize PixiJS app
-    await this.app.init({
-      canvas: document.createElement("canvas"),
-      width,
-      height,
-      backgroundColor: this.BG_COLOR,
-      autoDensity: true,
-      resizeTo: window,
-      antialias: true,
-    });
+      // Get canvas dimensions
+      const width = window.innerWidth;
+      const height = window.innerHeight;
 
-    // Add canvas to DOM if not provided
-    const canvas = this.app.canvas;
-    if (canvas.parentElement !== document.body) {
-      document.body.appendChild(canvas);
+      // Initialize PixiJS app (with timeout)
+      await withTimeout(
+        this.app.init({
+          width,
+          height,
+          backgroundColor: this.BG_COLOR,
+          autoDensity: true,
+          resizeTo: window,
+          antialias: true,
+          resolution: window.devicePixelRatio || 1,
+        }),
+        30000,
+        "PixiJS init timeout"
+      );
+
+      // Add canvas to DOM
+      const canvas = this.app.canvas;
+      console.log("Canvas element:", canvas, "width:", canvas.width, "height:", canvas.height);
+
+      // Find or create container
+      let container = document.getElementById("game-container");
+      if (!container) {
+        container = document.body;
+      }
+      container.appendChild(canvas);
+
+      // Ensure canvas is visible
+      canvas.style.display = "block";
+      canvas.style.width = "100%";
+      canvas.style.height = "100%";
+
+      console.log("PixiJS initialized, canvas appended");
+
+      // Add scene to stage
+      this.app.stage.addChild(this.scene);
+
+      // Create game objects
+      this.createPlayer();
+      this.createCoins();
+      this.createUI();
+
+      // Set up input handlers
+      this.setupInput();
+
+      // Center player
+      this.playerX = this.app.screen.width / 2;
+      this.playerY = this.app.screen.height / 2;
+      this.player.position.set(this.playerX, this.playerY);
+
+      // Load saved high score (non-blocking)
+      this.loadHighScore().catch(() => {});
+
+      // Start game loop
+      this.app.ticker.add(this.gameLoop.bind(this));
+
+      // Signal game ready (non-blocking)
+      this.platform.setLoadingProgress(100);
+      this.platform.startGame().catch(() => {});
+
+      // Update UI with player name (non-blocking)
+      this.platform.getPlayerName().then(name => {
+        this.updateWelcomeText(name);
+      }).catch(() => {
+        this.updateWelcomeText("Player");
+      });
+
+      console.log("Game initialized and started");
+    } catch (e) {
+      console.error("Game init error:", e);
+      throw e;
     }
-
-    // Add scene to stage
-    this.app.stage.addChild(this.scene);
-
-    // Create game objects
-    this.createPlayer();
-    this.createCoins();
-    this.createUI();
-
-    // Set up input handlers
-    this.setupInput();
-
-    // Center player
-    this.playerX = this.app.screen.width / 2;
-    this.playerY = this.app.screen.height / 2;
-
-    // Load saved high score
-    await this.loadHighScore();
-
-    // Start game loop
-    this.app.ticker.add(this.gameLoop.bind(this));
-
-    // Signal game ready
-    this.platform.setLoadingProgress(100);
-    await this.platform.startGame();
-
-    // Update UI with player name
-    const playerName = await this.platform.getPlayerName();
-    this.updateWelcomeText(playerName);
   }
 
   private createPlayer(): void {
     const halfSize = this.playerSize / 2;
     this.player.roundRect(-halfSize, -halfSize, this.playerSize, this.playerSize, 8);
     this.player.fill({ color: this.PLAYER_COLOR });
+    this.player.position.set(this.playerX, this.playerY);
     this.scene.addChild(this.player);
   }
 

@@ -1,16 +1,34 @@
 {
+  "private": true,
   "name": "reddit",
   "version": "0.0.0",
-  "private": true,
+  "license": "BSD-3-Clause",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"pnpm --filter reddit-client dev\" \"pnpm --filter reddit-server dev\"",
-    "client-build": "pnpm --filter reddit-client build",
-    "server-build": "pnpm --filter reddit-server build",
-    "build": "pnpm client-build && pnpm server-build",
-    "clean": "pnpm --filter reddit-client clean && pnpm --filter reddit-server clean"
+    "build": "vite build",
+    "dev": "pnpm exec devvit playtest",
+    "deploy": "pnpm exec devvit upload",
+    "launch": "pnpm run build && pnpm exec devvit publish",
+    "login": "pnpm exec devvit login"
+  },
+  "engines": {
+    "node": ">=22.2.0"
+  },
+  "dependencies": {
+    "@devvit/start": "0.12.12",
+    "@devvit/web": "0.12.12",
+    "@hono/node-server": "^1.19.9",
+    "devvit": "0.12.12",
+    "hono": "^4.11.7",
+    "@repo/game-core": "workspace:*",
+    "@repo/platform-reddit": "workspace:*",
+    "@repo/shared": "workspace:*",
+    "pixi.js": "^8.8.0"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.19.7",
+    "typescript": "^5.7.3",
+    "vite": "^7.3.1"
   }
 }

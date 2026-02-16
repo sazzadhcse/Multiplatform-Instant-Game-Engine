@@ -2,7 +2,9 @@
   "extends": "@repo/typescript-config/client.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "paths": {
+      "@repo/shared": ["../shared/src"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["dist", "node_modules"]
