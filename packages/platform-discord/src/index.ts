@@ -1,15 +1,5 @@
 import type { PlatformAPI } from "@repo/shared";
 
-// Dynamic import to avoid build issues
-let DiscordSDK: any = null;
-
-try {
-  const sdkModule = await import("@discord/embedded-app-sdk");
-  DiscordSDK = sdkModule.DiscordSDK;
-} catch (e) {
-  console.warn("Discord SDK not available, using mock");
-}
-
 function detectDiscordContext(): boolean {
   if (typeof window === "undefined") return false;
   const params = new URLSearchParams(window.location.search);
@@ -35,6 +25,19 @@ const createMockSDK = () => ({
   },
 });
 
+/**
+ * Dynamically import Discord SDK only when in Discord context
+ */
+async function loadDiscordSDK(): Promise<any> {
+  try {
+    const sdkModule = await import("@discord/embedded-app-sdk");
+    return sdkModule.DiscordSDK;
+  } catch (e) {
+    console.warn("Discord SDK not available:", e);
+    return null;
+  }
+}
+
 export class DiscordPlatform implements PlatformAPI {
   private sdk: any = null;
   private initialized = false;
@@ -43,19 +46,8 @@ export class DiscordPlatform implements PlatformAPI {
   private locale = "en";
 
   constructor() {
-    // Initialize SDK if available
-    if (DiscordSDK && detectDiscordContext()) {
-      try {
-        this.sdk = new DiscordSDK({
-          clientId: (import.meta.env as any).VITE_DISCORD_CLIENT_ID || "",
-        });
-      } catch (e) {
-        console.warn("Failed to initialize Discord SDK:", e);
-        this.sdk = createMockSDK();
-      }
-    } else {
-      this.sdk = createMockSDK();
-    }
+    // Use mock by default, SDK will be loaded during init if in Discord context
+    this.sdk = createMockSDK();
   }
 
   async initialize(): Promise<void> {
@@ -65,27 +57,37 @@ export class DiscordPlatform implements PlatformAPI {
     // Set default locale first
     this.locale = navigator.language?.split("-")[0] || "en";
 
-    // Skip SDK auth if no SDK available
-    if (!this.sdk || !this.sdk.commands) {
-      this.playerName = "Guest Player";
-      this.playerId = "guest_" + Math.random().toString(36).slice(2);
-      this.initialized = true;
-      return;
+    // Only load real SDK if we're in Discord context
+    if (detectDiscordContext()) {
+      const DiscordSDK = await loadDiscordSDK();
+      if (DiscordSDK) {
+        try {
+          this.sdk = new DiscordSDK({
+            clientId: (import.meta.env as any).VITE_DISCORD_CLIENT_ID || "",
+          });
+        } catch (e) {
+          console.warn("Failed to initialize Discord SDK:", e);
+          this.sdk = createMockSDK();
+        }
+      }
     }
 
-    try {
-      const auth = await this.sdk.commands.authenticate(
-        (import.meta.env as any).VITE_DISCORD_ACCESS_TOKEN || ""
-      );
+    // Try to authenticate
+    if (this.sdk?.commands) {
+      try {
+        const auth = await this.sdk.commands.authenticate(
+          (import.meta.env as any).VITE_DISCORD_ACCESS_TOKEN || ""
+        );
 
-      if (auth?.user) {
-        this.playerName = auth.user.username || "Player";
-        this.playerId = auth.user.id || this.playerId;
+        if (auth?.user) {
+          this.playerName = auth.user.username || "Player";
+          this.playerId = auth.user.id || this.playerId;
+        }
+      } catch (e) {
+        console.warn("Discord auth failed, using defaults:", e);
+        this.playerName = "Guest Player";
+        this.playerId = "guest_" + Math.random().toString(36).slice(2);
       }
-    } catch (e) {
-      console.warn("Discord auth failed, using defaults:", e);
-      this.playerName = "Guest Player";
-      this.playerId = "guest_" + Math.random().toString(36).slice(2);
     }
 
     this.initialized = true;
