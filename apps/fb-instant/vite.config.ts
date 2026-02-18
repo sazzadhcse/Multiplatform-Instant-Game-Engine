@@ -18,6 +18,7 @@ function copyFBConfig() {
 
 export default defineConfig({
   plugins: [basicSsl(), copyFBConfig()],
+  publicDir: resolve(__dirname, '../../public'), // Use shared public folder
   resolve: {
     alias: {
       '@repo/game-core': resolve(__dirname, '../../packages/game-core/src'),
@@ -44,5 +45,4 @@ export default defineConfig({
     },
     target: 'es2020'
   },
-  publicDir: 'public'
 });

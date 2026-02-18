@@ -1,6 +1,16 @@
 import 'pixi.js/unsafe-eval';
-import { Application, Container, Graphics, Text, Ticker } from "pixi.js";
+import { Application, type Ticker } from "pixi.js";
 import type { PlatformAPI } from "@repo/shared";
+
+// Import new architecture components
+import { LayoutSystem, DESIGN_W, DESIGN_H } from "./LayoutSystem.js";
+import { AudioManager, DEFAULT_AUDIO_SETTINGS, DEFAULT_AUDIO_REGISTRY } from "./AudioManager.js";
+import { SceneManager, createSceneTicker } from "./SceneManager.js";
+import type { GameContext, Scene } from "./Scene.js";
+import { LoadingScene } from "./scenes/LoadingScene.js";
+import { MenuScene } from "./scenes/MenuScene.js";
+import { GameplayScene } from "./scenes/GameplayScene.js";
+import { CompleteScene } from "./scenes/CompleteScene.js";
 
 interface GameOptions {
   platform: PlatformAPI;
@@ -8,22 +18,6 @@ interface GameOptions {
   width?: number;
   height?: number;
   bgColor?: number;
-}
-
-interface PlayerConfig {
-  x: number;
-  y: number;
-  size: number;
-  color: number;
-  speed: number;
-}
-
-interface CoinConfig {
-  x: number;
-  y: number;
-  radius: number;
-  color: number;
-  value: number;
 }
 
 // Helper: Promise with timeout
@@ -37,58 +31,77 @@ function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promi
 }
 
 /**
- * Core game class - platform-agnostic game logic
+ * Main Game class - Orchestrates the game with scene management
+ *
+ * Features:
+ * - 1920x1080 design coordinates
+ * - Hybrid scaling (FILL for backgrounds, FIT for gameplay/UI)
+ * - Scene management (Loading -> Menu -> Gameplay -> Complete -> Menu)
+ * - Audio system with BGM and SFX
+ * - Portrait orientation lock with overlay
  */
 export class Game {
   private app: Application;
   private platform: PlatformAPI;
-  private scene: Container;
-  private player: Graphics;
-  private coins: Graphics;
-  private uiText: Text;
-  private highScoreText: Text;
+  private layoutSystem: LayoutSystem;
+  private audioManager: AudioManager;
+  private sceneManager: SceneManager;
+  private context: GameContext;
 
-  // Game state
-  private playerX = 0;
-  private playerY = 0;
-  private playerSize = 40;
-  private playerSpeed = 5;
-  private playerColor = 0x00ff88;
-  private coinsArray: Array<{ x: number; y: number; collected: boolean }> = [];
-  private score = 0;
-  private highScore = 0;
-  private coinRadius = 12;
-  private coinColor = 0xffd700;
-  private coinValue = 10;
-  private bgColor = 0x1a1a2e;
+  private portraitOverlay: HTMLElement | null = null;
+  private isPortrait = false;
+  private isInitialized = false;
 
-  // Input state
-  private keys: Record<string, boolean> = {};
-  private touchStart: { x: number; y: number } | null = null;
-
-  private readonly PLAYER_COLOR = 0x00ff88;
-  private readonly COIN_COLOR = 0xffd700;
   private readonly BG_COLOR = 0x1a1a2e;
-  private readonly UI_COLOR = 0xffffff;
 
   constructor(options: GameOptions) {
     this.platform = options.platform;
 
     // Initialize PixiJS Application
     this.app = new Application();
-    this.scene = new Container();
 
-    // Create game objects (will be initialized in async init)
-    this.player = new Graphics();
-    this.coins = new Graphics();
-    this.uiText = new Text({ text: "", style: { fill: this.UI_COLOR, fontSize: 20 } });
-    this.highScoreText = new Text({ text: "", style: { fill: this.UI_COLOR, fontSize: 16 } });
+    // Initialize systems (will be configured in init())
+    this.layoutSystem = new LayoutSystem(this.app);
+    this.audioManager = new AudioManager(
+      { ...DEFAULT_AUDIO_SETTINGS },
+      DEFAULT_AUDIO_REGISTRY
+    );
+
+    // Create context object (will be enhanced after sceneManager is created)
+    this.context = {
+      app: this.app,
+      DESIGN_W,
+      DESIGN_H,
+      layout: this.layoutSystem,
+      audio: this.audioManager,
+      platform: this.platform,
+      sceneManager: null as any, // Will be set after creation
+      settings: {
+        audio: { ...DEFAULT_AUDIO_SETTINGS },
+      },
+      progress: {
+        lastScore: 0,
+        highScore: 0,
+      },
+      saveProgress: this.saveProgress.bind(this),
+      loadProgress: this.loadProgress.bind(this),
+    };
+
+    // Scene manager (now context has sceneManager reference)
+    this.sceneManager = new SceneManager(this.context);
+
+    // Add sceneManager back to context (circular dependency resolved)
+    this.context.sceneManager = this.sceneManager;
   }
 
   /**
    * Initialize the game
    */
   async init(): Promise<void> {
+    if (this.isInitialized) {
+      return;
+    }
+
     try {
       // Wait for platform initialization (with timeout)
       await withTimeout(
@@ -112,14 +125,14 @@ export class Game {
       const width = window.innerWidth;
       const height = window.innerHeight;
 
-      // Initialize PixiJS app (with timeout)
+      // Initialize PixiJS app
       await withTimeout(
         this.app.init({
           width,
           height,
           backgroundColor: this.BG_COLOR,
           autoDensity: true,
-          resizeTo: window,
+          resizeTo: window, // We'll use this for initial sizing only
           antialias: true,
           resolution: window.devicePixelRatio || 1,
         }),
@@ -145,38 +158,39 @@ export class Game {
 
       console.log("PixiJS initialized, canvas appended");
 
-      // Add scene to stage
-      this.app.stage.addChild(this.scene);
+      // Create scene layers (applies hybrid scaling)
+      const sceneLayers = this.layoutSystem.createSceneLayers();
+      this.app.stage.addChild(sceneLayers.root);
 
-      // Create game objects
-      this.createPlayer();
-      this.createCoins();
-      this.createUI();
+      // Add scene manager's root to the scene layers
+      const layers = this.layoutSystem.getSceneLayers();
+      if (layers) {
+        layers!.worldLayer.addChild(this.sceneManager.getSceneRoot());
+      }
 
-      // Set up input handlers
-      this.setupInput();
+      // Check for portrait orientation
+      this.checkOrientation();
 
-      // Center player
-      this.playerX = this.app.screen.width / 2;
-      this.playerY = this.app.screen.height / 2;
-      this.player.position.set(this.playerX, this.playerY);
+      // Create portrait overlay
+      this.createPortraitOverlay();
 
-      // Load saved high score (non-blocking)
-      this.loadHighScore().catch(() => {});
+      // Load saved progress
+      await this.loadProgress();
 
-      // Start game loop
-      this.app.ticker.add(this.gameLoop.bind(this));
+      // Start with LoadingScene
+      await this.startLoadingScene();
 
-      // Signal game ready (non-blocking)
+      // Connect ticker to scene manager
+      this.app.ticker.add(createSceneTicker(this.sceneManager));
+
+      // Handle orientation changes
+      window.addEventListener("resize", this.handleResize.bind(this));
+
+      // Signal game ready
       this.platform.setLoadingProgress(100);
       this.platform.startGame().catch(() => {});
 
-      // Update UI with player name (non-blocking)
-      this.platform.getPlayerName().then(name => {
-        this.updateWelcomeText(name);
-      }).catch(() => {
-        this.updateWelcomeText("Player");
-      });
+      this.isInitialized = true;
 
       console.log("Game initialized and started");
     } catch (e) {
@@ -185,208 +199,224 @@ export class Game {
     }
   }
 
-  private createPlayer(): void {
-    const halfSize = this.playerSize / 2;
-    this.player.roundRect(-halfSize, -halfSize, this.playerSize, this.playerSize, 8);
-    this.player.fill({ color: this.PLAYER_COLOR });
-    this.player.position.set(this.playerX, this.playerY);
-    this.scene.addChild(this.player);
+  /**
+   * Start with LoadingScene
+   * Scene will handle its own transitions to MenuScene
+   */
+  private async startLoadingScene(): Promise<void> {
+    const loadingScene = new LoadingScene(this.context);
+    await this.sceneManager.changeScene(loadingScene);
   }
 
-  private createCoins(): void {
-    // Create initial coins
-    this.spawnCoins(5);
-    this.scene.addChild(this.coins);
-    this.drawCoins();
-  }
+  /**
+   * Check and handle orientation
+   */
+  private checkOrientation(): void {
+    const wasPortrait = this.isPortrait;
+    this.isPortrait = this.layoutSystem.isPortrait();
 
-  private spawnCoins(count: number): void {
-    const margin = 50;
-    for (let i = 0; i < count; i++) {
-      this.coinsArray.push({
-        x: margin + Math.random() * (window.innerWidth - margin * 2),
-        y: margin + Math.random() * (window.innerHeight - margin * 2),
-        collected: false,
-      });
+    if (this.isPortrait && !wasPortrait) {
+      // Entered portrait mode
+      this.showPortraitOverlay();
+      this.pauseGame();
+    } else if (!this.isPortrait && wasPortrait) {
+      // Entered landscape mode
+      this.hidePortraitOverlay();
+      this.resumeGame();
     }
   }
 
-  private drawCoins(): void {
-    this.coins.clear();
-    for (const coin of this.coinsArray) {
-      if (!coin.collected) {
-        this.coins.circle(coin.x, coin.y, this.coinRadius);
-        this.coins.fill({ color: this.COIN_COLOR });
-      }
-    }
+  /**
+   * Handle window resize
+   */
+  private handleResize(): void {
+    this.checkOrientation();
   }
 
-  private createUI(): void {
-    this.uiText.anchor.set(0, 0);
-    this.uiText.x = 20;
-    this.uiText.y = 20;
-
-    this.highScoreText.anchor.set(1, 0);
-    this.highScoreText.x = this.app.screen.width - 20;
-    this.highScoreText.y = 20;
-
-    this.scene.addChild(this.uiText);
-    this.scene.addChild(this.highScoreText);
-
-    this.updateUI();
+  /**
+   * Pause the game (for portrait mode)
+   */
+  private pauseGame(): void {
+    this.app.ticker.speed = 0;
   }
 
-  private updateUI(): void {
-    this.uiText.text = `Score: ${this.score}`;
-    this.highScoreText.text = `High Score: ${this.highScore}`;
+  /**
+   * Resume the game
+   */
+  private resumeGame(): void {
+    this.app.ticker.speed = 1;
   }
 
-  private updateWelcomeText(playerName: string): void {
-    const welcomeText = new Text({
-      text: `Welcome, ${playerName}!`,
-      style: {
-        fill: 0x00ff88,
-        fontSize: 24,
-        fontWeight: "bold",
-      },
-    });
-    welcomeText.anchor.set(0.5);
-    welcomeText.x = this.app.screen.width / 2;
-    welcomeText.y = this.app.screen.height / 2 - 100;
+  /**
+   * Create portrait orientation overlay
+   */
+  private createPortraitOverlay(): void {
+    const overlay = document.createElement("div");
+    overlay.id = "portrait-overlay";
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 9999;
+      color: white;
+      font-family: Arial, sans-serif;
+    `;
 
-    this.scene.addChild(welcomeText);
-
-    // Fade out welcome text after 2 seconds
-    let alpha = 1;
-    const fadeInterval = setInterval(() => {
-      alpha -= 0.02;
-      welcomeText.alpha = alpha;
-      if (alpha <= 0) {
-        clearInterval(fadeInterval);
-        this.scene.removeChild(welcomeText);
-        welcomeText.destroy();
-      }
-    }, 30);
-  }
-
-  private setupInput(): void {
-    // Keyboard input
-    window.addEventListener("keydown", (e) => {
-      this.keys[e.key.toLowerCase()] = true;
-      this.keys[e.code] = true;
-    });
-
-    window.addEventListener("keyup", (e) => {
-      this.keys[e.key.toLowerCase()] = false;
-      this.keys[e.code] = false;
-    });
-
-    // Touch input
-    window.addEventListener("touchstart", (e) => {
-      this.touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    });
-
-    window.addEventListener("touchmove", (e) => {
-      if (!this.touchStart) return;
-      const dx = e.touches[0].clientX - this.touchStart.x;
-      const dy = e.touches[0].clientY - this.touchStart.y;
-      this.playerX += dx * 0.5;
-      this.playerY += dy * 0.5;
-      this.touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    });
-
-    window.addEventListener("touchend", () => {
-      this.touchStart = null;
-    });
-
-    // Handle resize
-    window.addEventListener("resize", () => {
-      this.highScoreText.x = this.app.screen.width - 20;
-    });
-  }
-
-  private gameLoop(_ticker: Ticker): void {
-    // Handle keyboard input
-    if (this.keys["arrowleft"] || this.keys["a"]) {
-      this.playerX -= this.playerSpeed;
-    }
-    if (this.keys["arrowright"] || this.keys["d"]) {
-      this.playerX += this.playerSpeed;
-    }
-    if (this.keys["arrowup"] || this.keys["w"]) {
-      this.playerY -= this.playerSpeed;
-    }
-    if (this.keys["arrowdown"] || this.keys["s"]) {
-      this.playerY += this.playerSpeed;
-    }
-
-    // Clamp player position
-    const halfSize = this.playerSize / 2;
-    this.playerX = Math.max(halfSize, Math.min(this.app.screen.width - halfSize, this.playerX));
-    this.playerY = Math.max(halfSize, Math.min(this.app.screen.height - halfSize, this.playerY));
-
-    // Update player graphics position
-    this.player.position.set(this.playerX, this.playerY);
-
-    // Check coin collisions
-    for (const coin of this.coinsArray) {
-      if (!coin.collected) {
-        const dx = this.playerX - coin.x;
-        const dy = this.playerY - coin.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance < this.playerSize / 2 + this.coinRadius) {
-          coin.collected = true;
-          this.score += this.coinValue;
-          this.updateUI();
-
-          // Spawn new coin
-          const margin = 50;
-          this.coinsArray.push({
-            x: margin + Math.random() * (this.app.screen.width - margin * 2),
-            y: margin + Math.random() * (this.app.screen.height - margin * 2),
-            collected: false,
-          });
-
-          this.drawCoins();
-
-          // Save score and check high score
-          this.saveProgress();
+    overlay.innerHTML = `
+      <div style="
+        width: 120px;
+        height: 120px;
+        border: 4px solid #00ff88;
+        border-radius: 16px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 24px;
+        transform: rotate(90deg);
+        animation: pulse 2s ease-in-out infinite;
+      ">
+        <svg width="60" height="60" viewBox="0 0 24 24" fill="#00ff88">
+          <path d="M21 4H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H3V6h18v12z"/>
+        </svg>
+      </div>
+      <p style="font-size: 24px; font-weight: bold; margin-bottom: 8px;">Rotate Your Device</p>
+      <p style="font-size: 16px; opacity: 0.7;">This game requires landscape orientation</p>
+      <style>
+        @keyframes pulse {
+          0%, 100% { transform: rotate(90deg) scale(1); opacity: 1; }
+          50% { transform: rotate(90deg) scale(1.05); opacity: 0.8; }
         }
-      }
+      </style>
+    `;
+
+    document.body.appendChild(overlay);
+    this.portraitOverlay = overlay;
+  }
+
+  /**
+   * Show portrait overlay
+   */
+  private showPortraitOverlay(): void {
+    if (this.portraitOverlay) {
+      this.portraitOverlay.style.display = "flex";
     }
   }
 
-  private async loadHighScore(): Promise<void> {
+  /**
+   * Hide portrait overlay
+   */
+  private hidePortraitOverlay(): void {
+    if (this.portraitOverlay) {
+      this.portraitOverlay.style.display = "none";
+    }
+  }
+
+  /**
+   * Load progress from platform storage
+   */
+  private async loadProgress(): Promise<void> {
     try {
-      const savedScore = await this.platform.getData("highScore");
-      if (savedScore) {
-        this.highScore = parseInt(savedScore, 10) || 0;
-        this.updateUI();
+      const highScoreData = await this.platform.getData("highScore");
+      if (highScoreData) {
+        this.context.progress.highScore = parseInt(highScoreData, 10) || 0;
       }
+
+      const lastScoreData = await this.platform.getData("lastScore");
+      if (lastScoreData) {
+        this.context.progress.lastScore = parseInt(lastScoreData, 10) || 0;
+      }
+
+      // Load audio settings
+      const musicEnabled = await this.platform.getData("musicEnabled");
+      if (musicEnabled !== null) {
+        this.context.settings.audio.musicEnabled = musicEnabled === "true";
+      }
+
+      const sfxEnabled = await this.platform.getData("sfxEnabled");
+      if (sfxEnabled !== null) {
+        this.context.settings.audio.sfxEnabled = sfxEnabled === "true";
+      }
+
+      const musicVolume = await this.platform.getData("musicVolume");
+      if (musicVolume !== null) {
+        this.context.settings.audio.musicVolume = parseFloat(musicVolume) || 0.7;
+      }
+
+      const sfxVolume = await this.platform.getData("sfxVolume");
+      if (sfxVolume !== null) {
+        this.context.settings.audio.sfxVolume = parseFloat(sfxVolume) || 0.8;
+      }
+
+      // Sync audio manager with loaded settings
+      this.audioManager.setMusicEnabled(this.context.settings.audio.musicEnabled);
+      this.audioManager.setSfxEnabled(this.context.settings.audio.sfxEnabled);
+      this.audioManager.setMusicVolume(this.context.settings.audio.musicVolume);
+      this.audioManager.setSfxVolume(this.context.settings.audio.sfxVolume);
+
+      console.log("Progress loaded:", this.context.progress);
     } catch (e) {
-      console.warn("Failed to load high score:", e);
+      console.warn("Failed to load progress:", e);
     }
   }
 
-  private saveProgress(): void {
-    if (this.score > this.highScore) {
-      this.highScore = this.score;
-      this.updateUI();
-      this.platform.setData("highScore", this.highScore.toString());
+  /**
+   * Save progress to platform storage
+   */
+  private async saveProgress(): Promise<void> {
+    try {
+      await this.platform.setData("highScore", this.context.progress.highScore.toString());
+      await this.platform.setData("lastScore", this.context.progress.lastScore.toString());
+
+      // Save audio settings
+      await this.platform.setData("musicEnabled", this.context.settings.audio.musicEnabled.toString());
+      await this.platform.setData("sfxEnabled", this.context.settings.audio.sfxEnabled.toString());
+      await this.platform.setData("musicVolume", this.context.settings.audio.musicVolume.toString());
+      await this.platform.setData("sfxVolume", this.context.settings.audio.sfxVolume.toString());
+
+      // Update platform score if supported
       if (this.platform.updateScore) {
-        this.platform.updateScore(this.highScore);
+        await this.platform.updateScore(this.context.progress.highScore);
       }
-    } else {
-      this.platform.setData("currentScore", this.score.toString());
+
+      console.log("Progress saved:", this.context.progress);
+    } catch (e) {
+      console.warn("Failed to save progress:", e);
     }
+  }
+
+  /**
+   * Get the current scene
+   */
+  getCurrentScene(): Scene | null {
+    return this.sceneManager.getCurrentScene();
   }
 
   /**
    * Destroy the game and cleanup resources
    */
   destroy(): void {
+    // Remove portrait overlay
+    if (this.portraitOverlay && this.portraitOverlay.parentNode) {
+      this.portraitOverlay.parentNode.removeChild(this.portraitOverlay);
+    }
+
+    // Destroy scene manager
+    this.sceneManager.destroy();
+
+    // Destroy audio manager
+    this.audioManager.destroy();
+
+    // Destroy PixiJS app
     this.app.destroy(true, { children: true, texture: true });
+
+    this.isInitialized = false;
   }
 
   /**
@@ -394,5 +424,19 @@ export class Game {
    */
   getApp(): Application {
     return this.app;
+  }
+
+  /**
+   * Get the audio manager (for external control)
+   */
+  getAudioManager(): AudioManager {
+    return this.audioManager;
+  }
+
+  /**
+   * Get the layout system
+   */
+  getLayoutSystem(): LayoutSystem {
+    return this.layoutSystem;
   }
 }

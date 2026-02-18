@@ -13,6 +13,7 @@ export default defineConfig({
       },
     }),
   ],
+  publicDir: resolve(__dirname, '../../public'), // Use shared public folder
   resolve: {
     alias: {
       '@repo/game-core': resolve(__dirname, '../../packages/game-core/src'),

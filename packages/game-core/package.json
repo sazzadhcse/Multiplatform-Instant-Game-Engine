@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@repo/shared": "workspace:*",
+    "@pixi/sound": "^5.2.3",
     "pixi.js": "^8.8.0"
   },
   "devDependencies": {
