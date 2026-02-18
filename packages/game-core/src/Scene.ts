@@ -90,11 +90,13 @@ export abstract class BaseScene implements Scene {
   container: Container;
   name: string;
   protected context: GameContext;
+  private layers: SceneLayers;
 
   constructor(name: string, context: GameContext) {
     this.name = name;
     this.context = context;
     this.container = new Container();
+    this.layers = this.context.layout.createLayerSet(this.container);
   }
 
   /**
@@ -141,11 +143,7 @@ export abstract class BaseScene implements Scene {
    * Helper to get scene layers for adding content
    */
   protected getLayers(): SceneLayers {
-    const layers = this.context.layout.getSceneLayers();
-    if (!layers) {
-      throw new Error("Scene layers not initialized. Call layout.createSceneLayers() first.");
-    }
-    return layers;
+    return this.layers;
   }
 
   /**

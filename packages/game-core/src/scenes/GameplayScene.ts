@@ -1,4 +1,4 @@
-import { Graphics, Text, Container, FederatedPointerEvent, Sprite, Assets } from "pixi.js";
+import { Graphics, Text, Container, Sprite, Assets } from "pixi.js";
 import { BaseScene, type GameContext } from "../Scene.js";
 import { CompleteScene } from "./CompleteScene.js";
 
@@ -305,65 +305,60 @@ export class GameplayScene extends BaseScene {
     }
   }
 
+  private readonly handleKeyDown = (e: KeyboardEvent): void => {
+    this.keys[e.key.toLowerCase()] = true;
+    this.keys[e.code] = true;
+  };
+
+  private readonly handleKeyUp = (e: KeyboardEvent): void => {
+    this.keys[e.key.toLowerCase()] = false;
+    this.keys[e.code] = false;
+  };
+
+  private readonly handleTouchStart = (e: TouchEvent): void => {
+    if (!this.container.stage) return;
+    const layout = this.context.layout.getLayoutState();
+    const touch = e.touches[0];
+    const localX = (touch.clientX - layout.offsetX) / layout.scaleFit;
+    const localY = (touch.clientY - layout.offsetY) / layout.scaleFit;
+    this.touchStart = { x: localX, y: localY };
+    this.touchActive = true;
+  };
+
+  private readonly handleTouchMove = (e: TouchEvent): void => {
+    if (!this.touchActive || !this.touchStart || !this.container.stage) return;
+    const layout = this.context.layout.getLayoutState();
+    const touch = e.touches[0];
+    const localX = (touch.clientX - layout.offsetX) / layout.scaleFit;
+    const localY = (touch.clientY - layout.offsetY) / layout.scaleFit;
+
+    this.playerX += localX - this.touchStart.x;
+    this.playerY += localY - this.touchStart.y;
+
+    this.touchStart = { x: localX, y: localY };
+    e.preventDefault();
+  };
+
+  private readonly handleTouchEnd = (): void => {
+    this.touchActive = false;
+    this.touchStart = null;
+  };
+
   private setupInput(): void {
-    // Keyboard input
-    window.addEventListener("keydown", (e) => {
-      this.keys[e.key.toLowerCase()] = true;
-      this.keys[e.code] = true;
-    });
-
-    window.addEventListener("keyup", (e) => {
-      this.keys[e.key.toLowerCase()] = false;
-      this.keys[e.code] = false;
-    });
-
-    // Touch input
-    const handleTouchStart = (e: TouchEvent) => {
-      if (!this.container.stage) return;
-      const layout = this.context.layout.getLayoutState();
-      const touch = e.touches[0];
-      const localX = (touch.clientX - layout.offsetX) / layout.scaleFit;
-      const localY = (touch.clientY - layout.offsetY) / layout.scaleFit;
-      this.touchStart = { x: localX, y: localY };
-      this.touchActive = true;
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (!this.touchActive || !this.touchStart || !this.container.stage) return;
-      const layout = this.context.layout.getLayoutState();
-      const touch = e.touches[0];
-      const localX = (touch.clientX - layout.offsetX) / layout.scaleFit;
-      const localY = (touch.clientY - layout.offsetY) / layout.scaleFit;
-
-      const dx = localX - this.touchStart.x;
-      const dy = localY - this.touchStart.y;
-      this.playerX += dx;
-      this.playerY += dy;
-
-      this.touchStart = { x: localX, y: localY };
-      e.preventDefault();
-    };
-
-    const handleTouchEnd = () => {
-      this.touchActive = false;
-      this.touchStart = null;
-    };
-
-    window.addEventListener("touchstart", handleTouchStart, { passive: false });
-    window.addEventListener("touchmove", handleTouchMove, { passive: false });
-    window.addEventListener("touchend", handleTouchEnd);
-
-    // Store cleanup function
-    this.inputCleanup = () => {
-      window.removeEventListener("keydown", () => {});
-      window.removeEventListener("keyup", () => {});
-      window.removeEventListener("touchstart", handleTouchStart);
-      window.removeEventListener("touchmove", handleTouchMove);
-      window.removeEventListener("touchend", handleTouchEnd);
-    };
+    window.addEventListener("keydown", this.handleKeyDown);
+    window.addEventListener("keyup", this.handleKeyUp);
+    window.addEventListener("touchstart", this.handleTouchStart, { passive: false });
+    window.addEventListener("touchmove", this.handleTouchMove, { passive: false });
+    window.addEventListener("touchend", this.handleTouchEnd);
   }
 
-  private inputCleanup: () => void = () => {};
+  private inputCleanup = (): void => {
+    window.removeEventListener("keydown", this.handleKeyDown);
+    window.removeEventListener("keyup", this.handleKeyUp);
+    window.removeEventListener("touchstart", this.handleTouchStart);
+    window.removeEventListener("touchmove", this.handleTouchMove);
+    window.removeEventListener("touchend", this.handleTouchEnd);
+  };
 
   update(dt: number): void {
     if (this.isPaused || this.isCompleted) {

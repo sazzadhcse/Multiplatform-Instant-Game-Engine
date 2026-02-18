@@ -1,5 +1,5 @@
 import 'pixi.js/unsafe-eval';
-import { Application, type Ticker } from "pixi.js";
+import { Application } from "pixi.js";
 import type { PlatformAPI } from "@repo/shared";
 
 // Import new architecture components
@@ -8,9 +8,6 @@ import { AudioManager, DEFAULT_AUDIO_SETTINGS, DEFAULT_AUDIO_REGISTRY } from "./
 import { SceneManager, createSceneTicker } from "./SceneManager.js";
 import type { GameContext, Scene } from "./Scene.js";
 import { LoadingScene } from "./scenes/LoadingScene.js";
-import { MenuScene } from "./scenes/MenuScene.js";
-import { GameplayScene } from "./scenes/GameplayScene.js";
-import { CompleteScene } from "./scenes/CompleteScene.js";
 
 interface GameOptions {
   platform: PlatformAPI;
@@ -51,6 +48,7 @@ export class Game {
   private portraitOverlay: HTMLElement | null = null;
   private isPortrait = false;
   private isInitialized = false;
+  private hasAudioUnlockListener = false;
 
   private readonly BG_COLOR = 0x1a1a2e;
 
@@ -132,7 +130,6 @@ export class Game {
           height,
           backgroundColor: this.BG_COLOR,
           autoDensity: true,
-          resizeTo: window, // We'll use this for initial sizing only
           antialias: true,
           resolution: window.devicePixelRatio || 1,
         }),
@@ -158,21 +155,12 @@ export class Game {
 
       console.log("PixiJS initialized, canvas appended");
 
-      // Create scene layers (applies hybrid scaling)
-      const sceneLayers = this.layoutSystem.createSceneLayers();
-      this.app.stage.addChild(sceneLayers.root);
-
-      // Add scene manager's root to the scene layers
-      const layers = this.layoutSystem.getSceneLayers();
-      if (layers) {
-        layers!.worldLayer.addChild(this.sceneManager.getSceneRoot());
-      }
-
       // Check for portrait orientation
       this.checkOrientation();
 
       // Create portrait overlay
       this.createPortraitOverlay();
+      this.setupAudioUnlockOnFirstGesture();
 
       // Load saved progress
       await this.loadProgress();
@@ -182,9 +170,7 @@ export class Game {
 
       // Connect ticker to scene manager
       this.app.ticker.add(createSceneTicker(this.sceneManager));
-
-      // Handle orientation changes
-      window.addEventListener("resize", this.handleResize.bind(this));
+      this.app.ticker.add(this.handleOrientationTick);
 
       // Signal game ready
       this.platform.setLoadingProgress(100);
@@ -227,11 +213,11 @@ export class Game {
   }
 
   /**
-   * Handle window resize
+   * Orientation handling only. Layout remains startup-only by design.
    */
-  private handleResize(): void {
+  private handleOrientationTick = (): void => {
     this.checkOrientation();
-  }
+  };
 
   /**
    * Pause the game (for portrait mode)
@@ -319,6 +305,26 @@ export class Game {
   }
 
   /**
+   * Unlock audio on first user gesture to satisfy browser autoplay policies.
+   */
+  private setupAudioUnlockOnFirstGesture(): void {
+    if (this.hasAudioUnlockListener) {
+      return;
+    }
+
+    const unlock = () => {
+      this.audioManager.unlock();
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+      this.hasAudioUnlockListener = false;
+    };
+
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    this.hasAudioUnlockListener = true;
+  }
+
+  /**
    * Load progress from platform storage
    */
   private async loadProgress(): Promise<void> {
@@ -402,6 +408,8 @@ export class Game {
    * Destroy the game and cleanup resources
    */
   destroy(): void {
+    this.app.ticker.remove(this.handleOrientationTick);
+
     // Remove portrait overlay
     if (this.portraitOverlay && this.portraitOverlay.parentNode) {
       this.portraitOverlay.parentNode.removeChild(this.portraitOverlay);
