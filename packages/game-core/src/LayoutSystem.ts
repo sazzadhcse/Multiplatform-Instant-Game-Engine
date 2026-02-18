@@ -116,45 +116,45 @@ export class LayoutSystem {
   }
 
   /**
-   * Create scene layers with proper scaling configuration
-   * This should be called once during initialization
+   * Apply centralized hybrid layout to an existing set of scene layers.
+   * Keep all scaling math in one place so scenes only use design coordinates.
    */
-  createSceneLayers(): SceneLayers {
+  applyLayout(layers: SceneLayers): void {
     const layout = this.computeLayout();
 
-    // Create root container
-    const root = new Container();
+    layers.bgLayer.scale.set(layout.scaleFill, layout.scaleFill);
+    layers.bgLayer.position.set(layout.screenWidth / 2, layout.screenHeight / 2);
+    layers.bgLayer.pivot.set(DESIGN_W / 2, DESIGN_H / 2);
 
-    // Background layer - FILL scaling
-    const bgLayer = new Container();
-    bgLayer.scale.set(layout.scaleFill, layout.scaleFill);
-    // Center the background
-    bgLayer.x = layout.screenWidth / 2;
-    bgLayer.y = layout.screenHeight / 2;
-    bgLayer.pivot.set(DESIGN_W / 2, DESIGN_H / 2);
+    layers.worldLayer.scale.set(layout.scaleFit, layout.scaleFit);
+    layers.worldLayer.position.set(layout.offsetX, layout.offsetY);
 
-    // World layer - FIT scaling
-    const worldLayer = new Container();
-    worldLayer.scale.set(layout.scaleFit, layout.scaleFit);
-    worldLayer.x = layout.offsetX;
-    worldLayer.y = layout.offsetY;
+    layers.uiLayer.scale.set(layout.scaleFit, layout.scaleFit);
+    layers.uiLayer.position.set(layout.offsetX, layout.offsetY);
+  }
 
-    // UI layer - FIT scaling
-    const uiLayer = new Container();
-    uiLayer.scale.set(layout.scaleFit, layout.scaleFit);
-    uiLayer.x = layout.offsetX;
-    uiLayer.y = layout.offsetY;
-
-    root.addChild(bgLayer, worldLayer, uiLayer);
-
-    this.sceneLayers = {
-      bgLayer,
-      worldLayer,
-      uiLayer,
+  /**
+   * Create one scene's layer stack.
+   * The root can be attached by SceneManager and cleaned up with the scene.
+   */
+  createLayerSet(root: Container = new Container()): SceneLayers {
+    const layers: SceneLayers = {
       root,
+      bgLayer: new Container(),
+      worldLayer: new Container(),
+      uiLayer: new Container(),
     };
+    layers.root.addChild(layers.bgLayer, layers.worldLayer, layers.uiLayer);
+    this.applyLayout(layers);
+    this.sceneLayers = layers;
+    return layers;
+  }
 
-    return this.sceneLayers;
+  /**
+   * Backwards-compatible alias.
+   */
+  createSceneLayers(): SceneLayers {
+    return this.createLayerSet();
   }
 
   /**
@@ -171,23 +171,7 @@ export class LayoutSystem {
     if (!this.sceneLayers) {
       return;
     }
-
-    const layout = this.computeLayout();
-
-    // Update background layer (FILL)
-    this.sceneLayers.bgLayer.scale.set(layout.scaleFill, layout.scaleFill);
-    this.sceneLayers.bgLayer.x = layout.screenWidth / 2;
-    this.sceneLayers.bgLayer.y = layout.screenHeight / 2;
-
-    // Update world layer (FIT)
-    this.sceneLayers.worldLayer.scale.set(layout.scaleFit, layout.scaleFit);
-    this.sceneLayers.worldLayer.x = layout.offsetX;
-    this.sceneLayers.worldLayer.y = layout.offsetY;
-
-    // Update UI layer (FIT)
-    this.sceneLayers.uiLayer.scale.set(layout.scaleFit, layout.scaleFit);
-    this.sceneLayers.uiLayer.x = layout.offsetX;
-    this.sceneLayers.uiLayer.y = layout.offsetY;
+    this.applyLayout(this.sceneLayers);
   }
 
   /**

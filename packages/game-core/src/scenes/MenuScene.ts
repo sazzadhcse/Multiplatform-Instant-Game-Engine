@@ -1,5 +1,6 @@
 import { Graphics, Text, Container, FederatedPointerEvent } from "pixi.js";
 import { BaseScene, type GameContext } from "../Scene.js";
+import { GameplayScene } from "./GameplayScene.js";
 
 /**
  * Button state for visual feedback
@@ -38,7 +39,10 @@ export class MenuScene extends BaseScene {
 
   private buttonStates: Map<Graphics, ButtonState> = new Map();
 
-  private onPlayCallback?: () => void;
+  private musicDragMoveHandler?: (e: FederatedPointerEvent) => void;
+  private musicDragUpHandler?: () => void;
+  private sfxDragMoveHandler?: (e: FederatedPointerEvent) => void;
+  private sfxDragUpHandler?: () => void;
 
   constructor(context: GameContext) {
     super("MenuScene", context);
@@ -57,13 +61,6 @@ export class MenuScene extends BaseScene {
     this.musicSliderText = new Text();
     this.sfxSliderText = new Text();
     this.highScoreText = new Text();
-  }
-
-  /**
-   * Set callback for when Play is clicked
-   */
-  onPlay(callback: () => void): void {
-    this.onPlayCallback = callback;
   }
 
   async create(): Promise<void> {
@@ -147,9 +144,7 @@ export class MenuScene extends BaseScene {
 
     this.setupButton(this.playButton, () => {
       this.context.audio.playSfx("sfx_click");
-      if (this.onPlayCallback) {
-        this.onPlayCallback();
-      }
+      this.changeScene(new GameplayScene(this.context));
     });
 
     uiLayer.addChild(this.playButton);
@@ -342,10 +337,11 @@ export class MenuScene extends BaseScene {
 
     // Use the app stage for global pointer events
     this.context.app.stage.eventMode = "static";
-    this.context.app.stage.on("pointermove", (e: FederatedPointerEvent) => {
+    const pointerMove = (e: FederatedPointerEvent) => {
       if (!isDragging) return;
 
-      const localX = e.global.x / this.context.layout.getLayoutState().scaleFit;
+      const layout = this.context.layout.getLayoutState();
+      const localX = (e.global.x - layout.offsetX) / layout.scaleFit;
       const relativeX = localX - x;
       const value = Math.max(0, Math.min(1, relativeX / sliderWidth));
       setValue(value);
@@ -356,14 +352,23 @@ export class MenuScene extends BaseScene {
       handle.fill({ color: 0x00ff88 });
 
       text.text = `${label}: ${Math.round(value * 100)}%`;
-    });
+    };
 
-    this.context.app.stage.on("pointerup", () => {
+    const pointerUp = () => {
       isDragging = false;
-    });
-    this.context.app.stage.on("pointerupoutside", () => {
-      isDragging = false;
-    });
+    };
+
+    this.context.app.stage.on("pointermove", pointerMove);
+    this.context.app.stage.on("pointerup", pointerUp);
+    this.context.app.stage.on("pointerupoutside", pointerUp);
+
+    if (label === "Music Volume") {
+      this.musicDragMoveHandler = pointerMove;
+      this.musicDragUpHandler = pointerUp;
+    } else if (label === "SFX Volume") {
+      this.sfxDragMoveHandler = pointerMove;
+      this.sfxDragUpHandler = pointerUp;
+    }
 
     uiLayer.addChild(handle);
 
@@ -439,7 +444,20 @@ export class MenuScene extends BaseScene {
   }
 
   exit(): void {
-    this.onPlayCallback = undefined;
+    if (this.musicDragMoveHandler) {
+      this.context.app.stage.off("pointermove", this.musicDragMoveHandler);
+    }
+    if (this.musicDragUpHandler) {
+      this.context.app.stage.off("pointerup", this.musicDragUpHandler);
+      this.context.app.stage.off("pointerupoutside", this.musicDragUpHandler);
+    }
+    if (this.sfxDragMoveHandler) {
+      this.context.app.stage.off("pointermove", this.sfxDragMoveHandler);
+    }
+    if (this.sfxDragUpHandler) {
+      this.context.app.stage.off("pointerup", this.sfxDragUpHandler);
+      this.context.app.stage.off("pointerupoutside", this.sfxDragUpHandler);
+    }
   }
 
   destroy(): void {

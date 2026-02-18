@@ -75,7 +75,7 @@ export class LoadingScene extends BaseScene {
     
     try {
       // Try to load the background image
-      const bgTexture = await Assets.load<Texture>("assets/images/bgLoading.jpg");
+      const bgTexture = await Assets.load("assets/images/bgLoading.jpg");
       
       this.backgroundSprite = new Sprite(bgTexture);
       this.backgroundSprite.anchor.set(0.5);
