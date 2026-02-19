@@ -31,9 +31,20 @@ export class LoadingScene extends BaseScene {
   private readonly imageAssets = [
     "assets/images/bgMenu.jpg",
     "assets/images/flag.png",
+    "assets/images/ship.png",
     "assets/images/pole.png",
     "assets/images/bgGameplay.jpg",
     "assets/images/bgComplete.png",
+    "assets/images/titleTop.png",
+    "assets/images/titleBottom.png",
+    "assets/images/uiCoin.png",
+    "assets/images/uiLife.png",
+    "assets/images/uiSetting.png",
+    "assets/images/uiMap.png",
+    "assets/images/uiBox.png",
+    "assets/images/uiAnchor.png",
+    "assets/images/uiTime.png",
+    "assets/images/uiPlayBg.png",
   ];
   
   private readonly audioAssets = [
@@ -52,6 +63,13 @@ export class LoadingScene extends BaseScene {
   }
   
   async create(): Promise<void> {
+    // Hide the HTML loading background now that LoadingScene is starting
+    const loadingBg = document.getElementById("loading-bg");
+    if (loadingBg) {
+      loadingBg.classList.add("hidden");
+      setTimeout(() => loadingBg.remove(), 500);
+    }
+
     const layers = this.getLayers();
     
     // Step 1: Load background image first (20% progress)

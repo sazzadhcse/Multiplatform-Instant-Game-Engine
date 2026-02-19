@@ -13,6 +13,22 @@
         overflow: hidden;
         border: 0;
       }
+      #loading-bg {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image: url('/assets/images/bgLoading.jpg');
+        background-size: cover;
+        background-position: center;
+        z-index: 9999;
+        transition: opacity 0.5s ease-out;
+      }
+      #loading-bg.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
       #app {
         width: 100%;
         height: 100%;
@@ -25,6 +41,7 @@
   </head>
 
   <body>
+    <div id="loading-bg"></div>
     <div id="app">
       <div id="game-container"></div>
     </div>

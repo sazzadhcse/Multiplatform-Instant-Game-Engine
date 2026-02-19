@@ -9,12 +9,14 @@ import { context } from "@devvit/web/client";
  */
 
 async function main(): Promise<void> {
-  // Fallback: remove loading screen after 8 seconds max
-  const loadingElement = document.getElementById("loading");
+  // Fallback: hide loading background after 15 seconds max
+  // (LoadingScene will handle this normally when it starts)
+  const loadingBg = document.getElementById("loading-bg");
   const loadingTimeout = setTimeout(() => {
-    loadingElement?.remove();
-    console.warn("Loading screen removed by timeout");
-  }, 8000);
+    loadingBg?.classList.add("hidden");
+    setTimeout(() => loadingBg?.remove(), 500);
+    console.warn("Loading background removed by timeout");
+  }, 15000);
 
   try {
     // Set base URL for API calls
@@ -28,14 +30,14 @@ async function main(): Promise<void> {
     await game.init();
 
     clearTimeout(loadingTimeout);
-
-    // Hide loading screen
-    loadingElement?.remove();
+    // LoadingScene will handle hiding the loading background
 
     console.log("Reddit game started for user:", context.username);
   } catch (e) {
     console.error("Game init failed:", e);
-    loadingElement?.remove();
+    clearTimeout(loadingTimeout);
+    loadingBg?.classList.add("hidden");
+    setTimeout(() => loadingBg?.remove(), 500);
   }
 }
 

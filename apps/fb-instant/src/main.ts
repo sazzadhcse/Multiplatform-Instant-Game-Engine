@@ -7,11 +7,14 @@ import { platform } from "@repo/platform-fb";
  */
 
 async function main(): Promise<void> {
-  // Fallback: remove loading screen after 8 seconds max
+  // Fallback: hide loading background after 15 seconds max
+  // (LoadingScene will handle this normally when it starts)
+  const loadingBg = document.getElementById("loading-bg");
   const loadingTimeout = setTimeout(() => {
-    document.getElementById("loading")?.remove();
-    console.warn("Loading screen removed by timeout");
-  }, 8000);
+    loadingBg?.classList.add("hidden");
+    setTimeout(() => loadingBg?.remove(), 500);
+    console.warn("Loading background removed by timeout");
+  }, 15000);
 
   try {
     // Create and initialize game with FB platform
@@ -22,14 +25,14 @@ async function main(): Promise<void> {
     await game.init();
 
     clearTimeout(loadingTimeout);
-
-    // Hide loading screen
-    document.getElementById("loading")?.remove();
+    // LoadingScene will handle hiding the loading background
 
     console.log("FB Instant Game started!");
   } catch (e) {
     console.error("Game init failed:", e);
-    document.getElementById("loading")?.remove();
+    clearTimeout(loadingTimeout);
+    loadingBg?.classList.add("hidden");
+    setTimeout(() => loadingBg?.remove(), 500);
   }
 }
 

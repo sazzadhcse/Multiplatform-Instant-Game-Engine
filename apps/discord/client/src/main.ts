@@ -13,11 +13,14 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Fallback: remove loading screen after 8 seconds max
+  // Fallback: hide loading background after 15 seconds max
+  // (LoadingScene will handle this normally when it starts)
+  const loadingBg = document.getElementById("loading-bg");
   const loadingTimeout = setTimeout(() => {
-    document.getElementById("loading")?.remove();
-    console.warn("Loading screen removed by timeout");
-  }, 8000);
+    loadingBg?.classList.add("hidden");
+    setTimeout(() => loadingBg?.remove(), 500);
+    console.warn("Loading background removed by timeout");
+  }, 15000);
 
   try {
     // Create and initialize game with Discord platform
@@ -28,16 +31,16 @@ async function main(): Promise<void> {
     await game.init();
 
     // Clear the timeout since init completed
+    // LoadingScene will handle hiding the loading background
     clearTimeout(loadingTimeout);
-
-    // Hide loading screen
-    document.getElementById("loading")?.remove();
 
     console.log("Discord game started!");
   } catch (e) {
     console.error("Game init failed:", e);
-    // Still remove loading screen on error
-    document.getElementById("loading")?.remove();
+    clearTimeout(loadingTimeout);
+    // Still hide loading background on error
+    loadingBg?.classList.add("hidden");
+    setTimeout(() => loadingBg?.remove(), 500);
   }
 }
 
