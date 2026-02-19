@@ -139,7 +139,7 @@ export class Game {
 
       // Add canvas to DOM
       const canvas = this.app.canvas;
-      console.log("Canvas element:", canvas, "width:", canvas.width, "height:", canvas.height);
+      console.log("Canvas width:", canvas.width, "height:", canvas.height);
 
       // Find or create container
       let container = document.getElementById("game-container");
@@ -172,13 +172,9 @@ export class Game {
       this.app.ticker.add(createSceneTicker(this.sceneManager));
       this.app.ticker.add(this.handleOrientationTick);
 
-      // Signal game ready
-      this.platform.setLoadingProgress(100);
-      this.platform.startGame().catch(() => {});
-
       this.isInitialized = true;
 
-      console.log("Game initialized and started");
+      console.log("Game initialized, starting loading...");
     } catch (e) {
       console.error("Game init error:", e);
       throw e;

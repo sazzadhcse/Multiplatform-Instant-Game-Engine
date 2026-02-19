@@ -47,6 +47,13 @@ export interface PlatformAPI {
   setLoadingProgress(percent: number): void;
 
   /**
+   * Preload assets using platform's caching system (e.g., FB Instant instantLoad)
+   * @param assets - Array of asset URLs to preload
+   * @returns Promise that resolves when preloading is complete
+   */
+  preloadAssets?(assets: string[]): Promise<void>;
+
+  /**
    * Signal that the game has finished loading and is ready to start
    */
   startGame(): Promise<void>;

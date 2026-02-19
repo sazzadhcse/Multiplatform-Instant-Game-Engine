@@ -77,12 +77,12 @@ export class MenuScene extends BaseScene {
   async create(): Promise<void> {
     const layers = this.getLayers();
     const uiLayer = layers.uiLayer;
-    
+
     // Create background with gradient effect
-    this.createBackground(layers.bgLayer);
+    await this.createBackground(layers.bgLayer);
 
     this.createMenuUI(uiLayer);
-    
+
     // Create title
     this.titleText.text = "COIN COLLECTOR";
     this.titleText.anchor.set(0.5);
@@ -100,7 +100,7 @@ export class MenuScene extends BaseScene {
       },
     };
     // uiLayer.addChild(this.titleText);
-    
+
     // Create high score display
     this.highScoreText.text = `High Score: ${this.context.progress.highScore}`;
     this.highScoreText.anchor.set(0.5);
@@ -111,112 +111,129 @@ export class MenuScene extends BaseScene {
       fontSize: 32,
     };
     // uiLayer.addChild(this.highScoreText);
-    
-    // Start menu music
+
+    // Start menu music (will queue if audio not unlocked yet)
     this.context.audio.playMusic("bgm_menu");
   }
   
   
-  
-  private createBackground(bgLayer: Container): void {
-    // Try to use pre-loaded background image, otherwise use fallback
+
+  private async createBackground(bgLayer: Container): Promise<void> {
+    // Try to load background image
     try {
-      const texture = Assets.get("assets/images/bgMenu.jpg");
-      if (texture) {
-        const sprite = new Sprite(texture);
-        sprite.anchor.set(0.5);
-        sprite.x = this.context.DESIGN_W / 2;
-        sprite.y = this.context.DESIGN_H / 2;
-        
-        // Scale to cover (FILL scaling)
-        const scaleX = this.context.DESIGN_W / sprite.width;
-        const scaleY = this.context.DESIGN_H / sprite.height;
-        const scale = Math.max(scaleX, scaleY);
-        sprite.scale.set(scale);
-        
-        bgLayer.addChild(sprite);
-      }
-    } catch {
-      // Fall through to fallback
-      // Fallback: procedural background
-      const bg = new Graphics();
-      bg.rect(0, 0, this.context.DESIGN_W, this.context.DESIGN_H);
-      bg.fill({
-        color: 0x1a1a2e,
-      });
-      
-      // Add some decorative circles
-      for (let i = 0; i < 10; i++) {
-        const x = Math.random() * this.context.DESIGN_W;
-        const y = Math.random() * this.context.DESIGN_H;
-        const radius = 50 + Math.random() * 150;
-        bg.circle(x, y, radius);
-        bg.fill({
-          color: 0x252540,
-          alpha: 0.5,
-        });
-      }
-      
-      bgLayer.addChild(bg);
+      console.log("[MenuScene] Loading background...");
+      const texture = await Assets.load("assets/images/bgMenu.jpg");
+      const sprite = new Sprite(texture);
+      sprite.anchor.set(0.5);
+      sprite.x = this.context.DESIGN_W / 2;
+      sprite.y = this.context.DESIGN_H / 2;
+
+      // Scale to cover (FILL scaling)
+      const scaleX = this.context.DESIGN_W / sprite.width;
+      const scaleY = this.context.DESIGN_H / sprite.height;
+      const scale = Math.max(scaleX, scaleY);
+      sprite.scale.set(scale);
+
+      bgLayer.addChild(sprite);
+      console.log("[MenuScene] ✓ Background loaded");
+    } catch (e) {
+      console.warn("[MenuScene] Background image not found, using fallback:", e);
+      this.createFallbackBackground(bgLayer);
     }
-    
-    
-    const shipTexture = Assets.get("assets/images/ship.png");
-    this.shipSprite = new Sprite(shipTexture);
-    this.shipSprite.anchor.set(0.5);
-    this.shipSprite.position.set(350, 450);
-    bgLayer.addChild(this.shipSprite);
-    
-    const bannerTex = Assets.get('assets/images/titleTop.png');
-    if (bannerTex) {
+
+    // Load ship sprite
+    try {
+      console.log("[MenuScene] Loading ship...");
+      const shipTexture = await Assets.load("assets/images/ship.png");
+      this.shipSprite = new Sprite(shipTexture);
+      this.shipSprite.anchor.set(0.5);
+      this.shipSprite.position.set(350, 450);
+      bgLayer.addChild(this.shipSprite);
+      console.log("[MenuScene] ✓ Ship loaded");
+    } catch (e) {
+      console.warn("[MenuScene] Ship not found:", e);
+    }
+
+    // Load banner (titleTop)
+    try {
+      console.log("[MenuScene] Loading banner...");
+      const bannerTex = await Assets.load('assets/images/titleTop.png');
       const segs = 10;
       const ropeLength = bannerTex.width / segs;
       for (let i = 0; i < segs; i++) this.bannerPoints.push(new Point(i * ropeLength, 0));
-      
+
       this.titleTopRope = new MeshRope({ texture: bannerTex, points: this.bannerPoints });
-      // Adjust position so the center aligns with your original 960, 400
-      this.titleTopRope.position.set(960 - (bannerTex.width / 2), 400); 
+      this.titleTopRope.position.set(960 - (bannerTex.width / 2), 400);
       bgLayer.addChild(this.titleTopRope);
+      console.log("[MenuScene] ✓ Banner loaded");
+    } catch (e) {
+      console.warn("[MenuScene] Banner not found:", e);
     }
-    
-    const titleBottom = Sprite.from('assets/images/titleBottom.png');
-    titleBottom.anchor.set(0.5);
-    titleBottom.position.set(960, 400);
-    bgLayer.addChild(titleBottom);
-    
-    
-    
+
+    // Load titleBottom (use Sprite.from which handles errors gracefully)
+    try {
+      const titleBottom = Sprite.from('assets/images/titleBottom.png');
+      titleBottom.anchor.set(0.5);
+      titleBottom.position.set(960, 400);
+      bgLayer.addChild(titleBottom);
+    } catch (e) {
+      console.warn("[MenuScene] TitleBottom not found:", e);
+    }
+
     // Create animated flag mesh
-    this.createFlagMesh(bgLayer);
+    await this.createFlagMesh(bgLayer);
   }
-  
-  
+
+  private createFallbackBackground(bgLayer: Container): void {
+    const bg = new Graphics();
+    bg.rect(0, 0, this.context.DESIGN_W, this.context.DESIGN_H);
+    bg.fill({ color: 0x1a1a2e });
+
+    // Add some decorative circles
+    for (let i = 0; i < 10; i++) {
+      const x = Math.random() * this.context.DESIGN_W;
+      const y = Math.random() * this.context.DESIGN_H;
+      const radius = 50 + Math.random() * 150;
+      bg.circle(x, y, radius);
+      bg.fill({ color: 0x252540, alpha: 0.5 });
+    }
+
+    bgLayer.addChild(bg);
+  }
+
+
   /**
   * Create the animated flag mesh
   */
-  private createFlagMesh(worldLayer: Container): void {
-    const poleTexture = Assets.get("assets/images/pole.png");
-    if (poleTexture) {
+  private async createFlagMesh(worldLayer: Container): Promise<void> {
+    try {
+      const poleTexture = await Assets.load("assets/images/pole.png");
       const sprite = new Sprite(poleTexture);
       sprite.anchor.set(0.5);
       sprite.x = 1400;
       sprite.y = 800;
       worldLayer.addChild(sprite);
+    } catch {
+      console.warn("Failed to load pole.png");
     }
-    
-    this.flagTexture = Assets.get("assets/images/flag.png");
-    if (!this.flagTexture) return;
-    
+
+    try {
+      this.flagTexture = await Assets.load("assets/images/flag.png");
+    } catch {
+      console.warn("Failed to load flag.png");
+      return;
+    }
+
     const segs = 15;
     const ropeLength = this.flagTexture.width / segs;
     this.flagPoints = [];
     for (let i = 0; i < segs; i++) {
       this.flagPoints.push(new Point(i * ropeLength, 0));
     }
-    
+
     const flagRope = new MeshRope({ texture: this.flagTexture, points: this.flagPoints });
     // Adjusting to match your offset
-    flagRope.x = 1400 - 45; 
+    flagRope.x = 1400 - 45;
     flagRope.y = 800 - 180 + (this.flagTexture.height / 2); // Rope center-aligns usually
     worldLayer.addChild(flagRope);
   }
@@ -288,8 +305,8 @@ export class MenuScene extends BaseScene {
     // Add Level Number (e.g., 19)
     this.addLabel(uiPlayBg, "19", { ...labelStyle, fontSize: 48 }, -5);
     this.makeInteractive(uiPlayBg, () => {
-       this.context.audio.playSound("sfx_click");
-       // this.changeScene(new GameplayScene(this.context)); 
+       this.context.audio.playSfx("sfx_click");
+       this.changeScene(new GameplayScene(this.context)); 
     });
   }
 

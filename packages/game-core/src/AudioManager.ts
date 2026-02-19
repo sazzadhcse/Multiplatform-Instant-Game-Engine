@@ -66,6 +66,9 @@ export class AudioManager {
   private isUnlocked = false;
   private registeredSounds = new Set<string>();
   private failedSounds = new Set<string>();
+  private pendingMusic: string | null = null; // Music to play after unlock
+  private pendingMusicOptions: { loop?: boolean; volume?: number } = {};
+  private audioBuffers: Map<string, ArrayBuffer> = new Map(); // Preloaded audio data
 
   constructor(
     settings: AudioSettings = DEFAULT_AUDIO_SETTINGS,
@@ -76,26 +79,83 @@ export class AudioManager {
   }
 
   /**
-   * Initialize audio - does NOT preload sounds to avoid decoding errors
-   * Sounds will be loaded lazily when first played
+   * Initialize audio - does NOT preload sounds
+   * Use preloadSounds() separately when you want to load audio
    */
   async init(): Promise<void> {
-    // Don't preload any sounds - they'll load on first play
-    // This avoids decoding errors during game initialization
-    console.log("AudioManager initialized (sounds will load on first play)");
-    await Promise.resolve(); // Just a no-op async for compatibility
+    console.log("AudioManager initialized");
+    await Promise.resolve();
   }
 
   /**
-   * Register a sound if not already registered
-   * Checks if sound was pre-registered by LoadingScene
+   * Preload all sounds from the registry
+   * Call this from LoadingScene to fetch audio data.
+   *
+   * This fetches audio files as ArrayBuffer WITHOUT triggering AudioContext.
+   * AudioContext is only created/resumed when user interacts.
    */
-  private registerSound(name: string): boolean {
-    if (this.registeredSounds.has(name) || this.failedSounds.has(name)) {
-      return this.registeredSounds.has(name);
+  async preloadSounds(onProgress?: (loaded: number, total: number) => void): Promise<void> {
+    const soundNames = Object.keys(this.registry);
+    const total = soundNames.length;
+    let loaded = 0;
+
+    console.log(`[AudioManager] Starting to preload ${total} sounds...`);
+
+    // Fetch all audio files as ArrayBuffer (no AudioContext involved)
+    const promises = soundNames.map(async (name) => {
+      await this.fetchSoundData(name);
+      loaded++;
+      if (onProgress) {
+        onProgress(loaded, total);
+      }
+    });
+
+    await Promise.allSettled(promises);
+    console.log(`[AudioManager] Preloaded ${loaded}/${total} sounds`);
+  }
+
+  /**
+   * Fetch audio data as ArrayBuffer without triggering AudioContext
+   */
+  private async fetchSoundData(name: string): Promise<void> {
+    if (this.audioBuffers.has(name)) {
+      return; // Already fetched
     }
 
-    // Check if sound was already registered by LoadingScene
+    const track = this.registry[name];
+    if (!track) {
+      console.warn(`Sound "${name}" not found in registry`);
+      this.failedSounds.add(name);
+      return;
+    }
+
+    try {
+      const response = await fetch(track.url);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      const buffer = await response.arrayBuffer();
+      this.audioBuffers.set(name, buffer);
+      console.log(`[AudioManager] Fetched audio data: ${name} (${buffer.byteLength} bytes)`);
+    } catch (err) {
+      console.warn(`[AudioManager] Failed to fetch audio "${name}":`, err);
+      this.failedSounds.add(name);
+    }
+  }
+
+  /**
+   * Register a sound with pixi-sound, using preloaded buffer if available
+   */
+  private registerSound(name: string): boolean {
+    if (this.registeredSounds.has(name)) {
+      return true; // Already registered
+    }
+
+    if (this.failedSounds.has(name)) {
+      return false; // Already failed, don't retry
+    }
+
+    // Check if sound was already registered
     if (sound.exists(name)) {
       this.registeredSounds.add(name);
       return true;
@@ -109,12 +169,28 @@ export class AudioManager {
     }
 
     try {
-      sound.add(name, {
-        url: track.url,
-        loop: track.loop ?? false,
-        volume: track.volume ?? 1,
-        preload: false, // Don't preload - load on play
-      });
+      const preloadedBuffer = this.audioBuffers.get(name);
+
+      if (preloadedBuffer) {
+        // Use preloaded ArrayBuffer - this will decode audio when AudioContext is ready
+        sound.add(name, {
+          source: preloadedBuffer,
+          loop: track.loop ?? false,
+          volume: track.volume ?? 1,
+          preload: true, // Decode the buffer (after AudioContext is ready)
+        });
+        console.log(`[AudioManager] Registered sound with preloaded buffer: ${name}`);
+      } else {
+        // Fallback to URL-based loading (lazy load)
+        sound.add(name, {
+          url: track.url,
+          loop: track.loop ?? false,
+          volume: track.volume ?? 1,
+          preload: true,
+        });
+        console.log(`[AudioManager] Registered sound with URL (no preloaded buffer): ${name}`);
+      }
+
       this.registeredSounds.add(name);
       return true;
     } catch (err) {
@@ -127,25 +203,77 @@ export class AudioManager {
   /**
    * Unlock audio context - must be called on first user interaction
    * Browsers block autoplay until user gesture
+   *
+   * This resumes the AudioContext if it's suspended
+   * Returns true if successfully unlocked (or already unlocked)
    */
   unlock(): boolean {
     if (this.isUnlocked) {
+      // Already unlocked, play pending music if any
+      this.playPendingMusic();
       return true;
     }
 
     try {
-      const wasUnlocked = sound.isContextReady();
-      if (wasUnlocked) {
-        this.isUnlocked = true;
-        return true;
+      // Try to get the internal WebAudioContext and resume it
+      // pixi-sound stores the context internally
+      let audioContext: any = null;
+
+      // Try multiple paths to find the AudioContext
+      // @ts-ignore
+      if (sound.context?.audioContext) {
+        // @ts-ignore
+        audioContext = sound.context.audioContext;
+      }
+      // @ts-ignore
+      else if (sound._soundContext?.audioContext) {
+        // @ts-ignore
+        audioContext = sound._soundContext.audioContext;
+      }
+      // @ts-ignore
+      else if (sound['_context']?.audioContext) {
+        // @ts-ignore
+        audioContext = sound['_context'].audioContext;
       }
 
-      // Try to unlock by attempting to play a silent/empty action
-      // Just checking context state is often enough
-      this.isUnlocked = sound.isContextReady();
-      return this.isUnlocked;
-    } catch {
+      if (audioContext) {
+        if (audioContext.state === 'suspended') {
+          audioContext.resume().then(() => {
+            this.isUnlocked = true;
+            console.log('[AudioManager] AudioContext resumed successfully');
+            this.playPendingMusic();
+          }).catch((e: any) => {
+            console.warn('[AudioManager] Failed to resume AudioContext:', e);
+          });
+          return true;
+        } else if (audioContext.state === 'running') {
+          // Already running
+          this.isUnlocked = true;
+          this.playPendingMusic();
+          console.log('[AudioManager] AudioContext already running');
+          return true;
+        }
+      }
+
+      console.warn('[AudioManager] Could not access AudioContext for unlock');
       return false;
+    } catch (e) {
+      console.warn('[AudioManager] Failed to unlock audio:', e);
+      return false;
+    }
+  }
+
+  /**
+   * Play any pending music after unlock
+   */
+  private playPendingMusic(): void {
+    if (this.pendingMusic) {
+      const musicToPlay = this.pendingMusic;
+      const options = this.pendingMusicOptions;
+      this.pendingMusic = null; // Clear before playing to avoid infinite loop
+      this.pendingMusicOptions = {};
+      console.log(`Playing pending music: ${musicToPlay}`);
+      this.playMusic(musicToPlay, options);
     }
   }
 
@@ -153,15 +281,34 @@ export class AudioManager {
    * Check if audio is unlocked (can play)
    */
   isAudioUnlocked(): boolean {
-    return this.isUnlocked || sound.isContextReady();
+    if (this.isUnlocked) {
+      return true;
+    }
+
+    // Try to check the AudioContext state directly
+    try {
+      // @ts-ignore
+      const context = sound.context?.audioContext || sound._soundContext?.audioContext || sound['_context']?.audioContext;
+      if (context && context.state === 'running') {
+        return true;
+      }
+    } catch {
+      // Ignore
+    }
+
+    return false;
   }
 
   /**
    * Play background music
    * Automatically switches tracks if different from current
    * Ensures only ONE BGM plays at a time
+   *
+   * If audio is not unlocked yet, music will be queued to play after first user gesture
    */
   playMusic(trackName: string, options: { loop?: boolean; volume?: number } = {}): void {
+    console.log(`[AudioManager] playMusic called with track: ${trackName}, musicEnabled: ${this.settings.musicEnabled}`);
+
     if (!this.settings.musicEnabled) {
       this.stopMusic(); // Ensure music is stopped if disabled
       return;
@@ -177,7 +324,7 @@ export class AudioManager {
     if (this.currentMusic === trackName && this.currentMusicInstance) {
       // Check if it's actually still playing
       try {
-        if (sound.isPlaying(trackName)) {
+        if (sound.isPlaying()) {
           return; // Already playing this track
         }
       } catch {
@@ -187,6 +334,17 @@ export class AudioManager {
 
     // IMPORTANT: Stop ALL music first to prevent overlapping
     this.stopMusic();
+
+    // If audio is not unlocked yet, queue the music to play after unlock
+    const isReady = this.isAudioUnlocked();
+    console.log(`[AudioManager] playMusic("${trackName}") - isUnlocked: ${this.isUnlocked}, isReady: ${isReady}`);
+
+    if (!isReady) {
+      this.pendingMusic = trackName;
+      this.pendingMusicOptions = options;
+      console.log(`[AudioManager] Music queued to play after unlock: ${trackName}`);
+      return;
+    }
 
     // Unlock audio if not already
     this.unlock();
@@ -231,8 +389,8 @@ export class AudioManager {
       this.currentMusicInstance = null;
     }
 
-    // Also stop by name to be sure
-    if (this.currentMusic) {
+    // Also stop by name to be sure (only if sound exists)
+    if (this.currentMusic && sound.exists(this.currentMusic)) {
       try {
         sound.stop(this.currentMusic);
       } catch {
@@ -241,7 +399,10 @@ export class AudioManager {
     }
 
     // Stop all music tracks (bgm_*) to be absolutely sure no overlap
-    const musicTracks = Object.keys(this.registry).filter(k => k.startsWith('bgm_'));
+    // Only stop sounds that actually exist to avoid assertion errors
+    const musicTracks = Object.keys(this.registry).filter(k =>
+      k.startsWith('bgm_') && sound.exists(k)
+    );
     for (const track of musicTracks) {
       try {
         sound.stop(track);
@@ -279,9 +440,7 @@ export class AudioManager {
 
     try {
       const volume = options.volume ?? this.settings.sfxVolume;
-      sound.play(name, { volume }).catch((e) => {
-        console.warn(`Failed to play SFX "${name}":`, e);
-      });
+      sound.play(name, { volume });
     } catch (e) {
       console.warn(`Failed to play SFX "${name}":`, e);
     }
@@ -313,7 +472,7 @@ export class AudioManager {
     if (this.currentMusic && this.registeredSounds.has(this.currentMusic)) {
       // Volume update would need to track the instance
       // For simplicity, restart with new volume
-      const isPlaying = sound.isPlaying(this.currentMusic);
+      const isPlaying = sound.isPlaying();
       if (isPlaying) {
         this.stopMusic();
         this.playMusic(this.currentMusic);
@@ -346,7 +505,7 @@ export class AudioManager {
    * Check if music is currently playing
    */
   isMusicPlaying(): boolean {
-    return this.currentMusic !== null && sound.isPlaying(this.currentMusic);
+    return this.currentMusic !== null && sound.isPlaying();
   }
 
   /**
@@ -364,25 +523,12 @@ export class AudioManager {
   }
 
   /**
-   * Mute all audio
-   */
-  muteAll(): void {
-    sound.toggleMute(true);
-  }
-
-  /**
-   * Unmute all audio
-   */
-  unmuteAll(): void {
-    sound.toggleMute(false);
-  }
-
-  /**
    * Destroy and cleanup
    */
   destroy(): void {
     this.stopMusic();
     this.currentMusicInstance = null;
+    this.audioBuffers.clear();
     sound.removeAll();
     this.registeredSounds.clear();
     this.failedSounds.clear();

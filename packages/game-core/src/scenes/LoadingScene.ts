@@ -1,7 +1,7 @@
 import { Graphics, Text, Container, Sprite, Assets } from "pixi.js";
-import { sound } from "@pixi/sound";
 import { BaseScene, type GameContext } from "../Scene.js";
 import { MenuScene } from "./MenuScene.js";
+import { DEFAULT_AUDIO_REGISTRY } from "../AudioManager.js";
 
 /**
 * LoadingScene - Shows loading progress and transitions to MenuScene
@@ -28,7 +28,7 @@ export class LoadingScene extends BaseScene {
   
   
   // Assets to load
-  private readonly imageAssets = [
+  private imageAssets = [
     "assets/images/bgMenu.jpg",
     "assets/images/flag.png",
     "assets/images/ship.png",
@@ -47,13 +47,8 @@ export class LoadingScene extends BaseScene {
     "assets/images/uiPlayBg.png",
   ];
   
-  private readonly audioAssets = [
-    { name: "bgm_menu", url: "assets/audio/bgm_menu.wav" },
-    { name: "bgm_gameplay", url: "assets/audio/bgm_gameplay.mp3" },
-    { name: "sfx_click", url: "assets/audio/sfx_click.mp3" },
-    { name: "sfx_complete", url: "assets/audio/sfx_complete.mp3" },
-    { name: "sfx_coin", url: "assets/audio/sfx_coin.wav" },
-  ];
+  // Audio assets are loaded via AudioManager from DEFAULT_AUDIO_REGISTRY
+  private readonly audioAssetCount = Object.keys(DEFAULT_AUDIO_REGISTRY).length;
   
   constructor(context: GameContext) {
     super("LoadingScene", context);
@@ -69,7 +64,7 @@ export class LoadingScene extends BaseScene {
       loadingBg.classList.add("hidden");
       setTimeout(() => loadingBg.remove(), 500);
     }
-
+    
     const layers = this.getLayers();
     
     // Step 1: Load background image first (20% progress)
@@ -77,6 +72,12 @@ export class LoadingScene extends BaseScene {
     
     // Step 2: Create UI elements (loading bar, text)
     this.createLoadingUI(layers.uiLayer);
+    
+    
+    for (let i = 0; i < 3; i++) {
+      this.imageAssets.push(`assets/images/heart${i + 1}.png`); 
+    }
+    
     
     // Step 3: Load all game assets with progress tracking
     await this.loadAllAssets(layers.worldLayer);
@@ -176,20 +177,24 @@ export class LoadingScene extends BaseScene {
   * Load all game assets (images + audio) with progress tracking
   */
   private async loadAllAssets(worldLayer: Container): Promise<void> {
-    this.totalAssets = this.imageAssets.length + this.audioAssets.length;
+    this.totalAssets = this.imageAssets.length + this.audioAssetCount;
     this.loadedAssets = 0;
     
     // Calculate progress per asset (from 20% to 100%)
     const progressRange = 80; // 80% remaining after background
     const progressPerAsset = progressRange / this.totalAssets;
     
-    // Load images first (easier, fewer errors)
+    // NOTE: FB's instantLoad DISABLED - causes 403 errors when assets aren't on FB CDN
+    // In production, upload assets to FB first, then re-enable this
+    
+    // Step 1: Load images via PixiJS Assets with proper error handling
     for (const imageUrl of this.imageAssets) {
       try {
-        await Assets.load(imageUrl);
-        console.log(`Loaded image: ${imageUrl}`);
+        console.log(`[LoadingScene] Loading: ${imageUrl}`);
+        const texture = await Assets.load(imageUrl);
+        console.log(`[LoadingScene] ✓ Loaded: ${imageUrl} (${texture.width}x${texture.height})`);
       } catch (e) {
-        console.warn(`Failed to load image "${imageUrl}":`, e);
+        console.error(`[LoadingScene] ✗ Failed to load "${imageUrl}":`, e);
       } finally {
         this.loadedAssets++;
         const currentProgress = 20 + (this.loadedAssets * progressPerAsset);
@@ -197,55 +202,61 @@ export class LoadingScene extends BaseScene {
       }
     }
     
-    // Load audio files (handle decoding errors gracefully)
-    for (const audio of this.audioAssets) {
-      try {
-        // Try to add the sound to pixi-sound
-        // Use preload:false to avoid blocking, then manually trigger load
-        sound.add(audio.name, {
-          url: audio.url,
-          preload: false,
-        });
+    // Step 2: Load audio files via AudioManager
+    await this.context.audio.preloadSounds((loaded, total) => {
+      this.loadedAssets = this.imageAssets.length + loaded;
+      const currentProgress = 20 + (this.loadedAssets * progressPerAsset);
+      this.updateProgress(currentProgress, `Loading audio... ${loaded}/${total}`);
+    });
+    
+    console.log(`[LoadingScene] All ${this.audioAssetCount} audio sounds preloaded`);
+    
+    // Step 3: Verify critical assets are in PixiJS cache
+    // const criticalAssets = [
+    //   "assets/images/bgMenu.jpg",
+    //   "assets/images/bgGameplay.jpg",
+    //   "assets/images/ship.png",
+    // ];
+    
+    
+    // let cachedCount = 0;
+    // for (const asset of criticalAssets) {
+    //   try {
+    //     // Check if asset exists in PixiJS cache
+    //     // @ts-ignore - accessing internal cache
+    //     const cache = Assets.cache;
+    //     const hasKey = cache.has(asset);
         
-        // Attempt to load the sound
-        await new Promise<void>((resolve) => {
-          const soundObj = sound.find(audio.name);
-          if (soundObj) {
-            soundObj.play({ volume: 0 }); // Play silently to trigger load
-            soundObj.stop(); // Stop immediately
-            
-            // Wait a bit for loading to start
-            setTimeout(() => {
-              resolve();
-            }, 50);
-          } else {
-            resolve(); // Continue even if sound not found
-          }
-        });
-        
-        console.log(`Loaded audio: ${audio.name}`);
-      } catch (e) {
-        // Audio loading failed - likely unsupported format or corrupted file
-        // Don't crash, just log and continue
-        console.warn(`Failed to load audio "${audio.name}" (will skip):`, e.message);
-      } finally {
-        this.loadedAssets++;
-        const currentProgress = 20 + (this.loadedAssets * progressPerAsset);
-        this.updateProgress(currentProgress, `Loading assets... ${this.loadedAssets}/${this.totalAssets}`);
-      }
-    }
+    //     if (hasKey) {
+    //       console.log(`[LoadingScene] ✓ Cache hit: ${asset}`);
+    //       cachedCount++;
+    //     } else {
+    //       console.warn(`[LoadingScene] ⚠ Cache miss, reloading: ${asset}`);
+    //       await Assets.load(asset);
+    //       cachedCount++;
+    //     }
+    //   } catch (e) {
+    //     console.error(`[LoadingScene] ✗ Cannot cache "${asset}":`, e);
+    //   }
+    // }
+    
+    // console.log(`[LoadingScene] Cache verification: ${cachedCount}/${criticalAssets.length} critical assets`);
     
     // All done!
     this.updateProgress(100, "Loading complete!");
-    
   }
   
   
   /**
   * Update progress state
+  * Also reports progress to the platform (e.g., FB Instant)
   */
   private updateProgress(value: number, message: string): void {
     this.progress = Math.min(100, Math.max(0, value));
+    
+    // Report progress to the platform (FB Instant, etc.)
+    this.context.platform.setLoadingProgress(this.progress);
+    
     this.updateLoadingBar();
     if (this.loadingText) {
       this.loadingText.text = message;
@@ -275,6 +286,13 @@ export class LoadingScene extends BaseScene {
     // Check if loading is complete, then transition to MenuScene
     if (this.progress >= 100 && !this.transitioned) {
       this.transitioned = true;
+      
+      console.log("[LoadingScene] Loading complete, starting game...");
+      
+      // Signal FB that loading is complete and game is ready
+      this.context.platform.startGame().catch(() => {
+        console.warn("[LoadingScene] startGame() failed (non-FB environment?)");
+      });
       
       // Unlock audio on first user-triggered transition
       this.context.audio.unlock();
