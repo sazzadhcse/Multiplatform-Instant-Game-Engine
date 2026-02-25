@@ -3,9 +3,9 @@ import { Application } from "pixi.js";
 import type { PlatformAPI } from "@repo/shared";
 
 // Import new architecture components
-import { LayoutSystem, DESIGN_W, DESIGN_H } from "./LayoutSystem.js";
-import { AudioManager, DEFAULT_AUDIO_SETTINGS, DEFAULT_AUDIO_REGISTRY } from "./AudioManager.js";
-import { SceneManager, createSceneTicker } from "./SceneManager.js";
+import { LayoutManager, DESIGN_W, DESIGN_H } from "./managers/LayoutManager.js";
+import { AudioManager, DEFAULT_AUDIO_SETTINGS, DEFAULT_AUDIO_REGISTRY } from "./managers/AudioManager.js";
+import { SceneManager, createSceneTicker } from "./managers/SceneManager.js";
 import type { GameContext, Scene } from "./Scene.js";
 import { LoadingScene } from "./scenes/LoadingScene.js";
 
@@ -40,7 +40,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promi
 export class Game {
   private app: Application;
   private platform: PlatformAPI;
-  private layoutSystem: LayoutSystem;
+  private layoutSystem: LayoutManager;
   private audioManager: AudioManager;
   private sceneManager: SceneManager;
   private context: GameContext;
@@ -59,7 +59,7 @@ export class Game {
     this.app = new Application();
 
     // Initialize systems (will be configured in init())
-    this.layoutSystem = new LayoutSystem(this.app);
+    this.layoutSystem = new LayoutManager(this.app);
     this.audioManager = new AudioManager(
       { ...DEFAULT_AUDIO_SETTINGS },
       DEFAULT_AUDIO_REGISTRY
@@ -80,6 +80,7 @@ export class Game {
       progress: {
         lastScore: 0,
         highScore: 0,
+        currentLevel: 0,
       },
       saveProgress: this.saveProgress.bind(this),
       loadProgress: this.loadProgress.bind(this),
@@ -334,6 +335,11 @@ export class Game {
       if (lastScoreData) {
         this.context.progress.lastScore = parseInt(lastScoreData, 10) || 0;
       }
+      
+      const currentLevelData = await this.platform.getData("currentLevel");
+      if (currentLevelData) {
+        this.context.progress.currentLevel = parseInt(currentLevelData, 10) || 1;
+      }
 
       // Load audio settings
       const musicEnabled = await this.platform.getData("musicEnabled");
@@ -375,6 +381,7 @@ export class Game {
     try {
       await this.platform.setData("highScore", this.context.progress.highScore.toString());
       await this.platform.setData("lastScore", this.context.progress.lastScore.toString());
+      await this.platform.setData("currentLevel", this.context.progress.currentLevel.toString());
 
       // Save audio settings
       await this.platform.setData("musicEnabled", this.context.settings.audio.musicEnabled.toString());
@@ -440,7 +447,7 @@ export class Game {
   /**
    * Get the layout system
    */
-  getLayoutSystem(): LayoutSystem {
+  getLayoutSystem(): LayoutManager {
     return this.layoutSystem;
   }
 }

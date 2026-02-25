@@ -7,7 +7,7 @@ export const DESIGN_W = 1920;
 export const DESIGN_H = 1080;
 
 /**
- * Layout state computed by the LayoutSystem
+ * Layout state computed by the LayoutManager
  */
 export interface LayoutState {
   /** FIT scale factor for world/UI layers */
@@ -47,13 +47,13 @@ export interface SceneLayers {
 }
 
 /**
- * LayoutSystem - Handles hybrid scaling policy:
+ * LayoutManager - Handles hybrid scaling policy:
  * - Backgrounds: FILL scaling (cover screen)
  * - Gameplay + UI: FIT scaling (maintain aspect ratio with letterboxing)
  *
  * All positions are authored in design coordinates (1920x1080)
  */
-export class LayoutSystem {
+export class LayoutManager {
   private app: Application;
   private sceneLayers: SceneLayers | null = null;
   private layoutState: LayoutState | null = null;

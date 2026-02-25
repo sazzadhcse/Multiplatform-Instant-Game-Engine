@@ -1,0 +1,276 @@
+{
+  "id": "level_custom",
+  "wasteCard": {
+    "suit": "heart",
+    "rank": 11
+  },
+  "stockPile": [
+    {
+      "suit": "spade",
+      "rank": 5
+    },
+    {
+      "suit": "diamond",
+      "rank": 9
+    },
+    {
+      "suit": "heart",
+      "rank": 1
+    },
+    {
+      "suit": "club",
+      "rank": 8
+    },
+    {
+      "suit": "spade",
+      "rank": 3
+    },
+    {
+      "suit": "diamond",
+      "rank": 9
+    },
+    {
+      "suit": "diamond",
+      "rank": 5
+    }
+  ],
+  "layout": [
+    {
+      "suit": "diamond",
+      "rank": 4,
+      "x": 1695,
+      "y": 668,
+      "angle": -50,
+      "covers": []
+    },
+    {
+      "suit": "diamond",
+      "rank": 7,
+      "x": 1449,
+      "y": 673,
+      "angle": -50,
+      "covers": []
+    },
+    {
+      "suit": "spade",
+      "rank": 8,
+      "x": 1169,
+      "y": 671,
+      "angle": -50,
+      "covers": []
+    },
+    {
+      "suit": "spade",
+      "rank": 3,
+      "x": 906,
+      "y": 674,
+      "angle": 40,
+      "covers": []
+    },
+    {
+      "suit": "spade",
+      "rank": 10,
+      "x": 637,
+      "y": 670,
+      "angle": 40,
+      "covers": []
+    },
+    {
+      "suit": "diamond",
+      "rank": 12,
+      "x": 339,
+      "y": 676,
+      "angle": 40,
+      "covers": []
+    },
+    {
+      "suit": "club",
+      "rank": 10,
+      "x": 1685,
+      "y": 626,
+      "angle": 40,
+      "covers": [
+        0
+      ]
+    },
+    {
+      "suit": "spade",
+      "rank": 11,
+      "x": 1438,
+      "y": 630,
+      "angle": 40,
+      "covers": [
+        1
+      ]
+    },
+    {
+      "suit": "diamond",
+      "rank": 10,
+      "x": 1162,
+      "y": 630,
+      "angle": 40,
+      "covers": [
+        2
+      ]
+    },
+    {
+      "suit": "heart",
+      "rank": 2,
+      "x": 905,
+      "y": 626,
+      "angle": -50,
+      "covers": [
+        3
+      ]
+    },
+    {
+      "suit": "diamond",
+      "rank": 12,
+      "x": 634,
+      "y": 618,
+      "angle": -50,
+      "covers": [
+        4
+      ]
+    },
+    {
+      "suit": "club",
+      "rank": 13,
+      "x": 341,
+      "y": 626,
+      "angle": -50,
+      "covers": [
+        5
+      ]
+    },
+    {
+      "suit": "diamond",
+      "rank": 6,
+      "x": 1688,
+      "y": 581,
+      "angle": -50,
+      "covers": [
+        0,
+        6
+      ]
+    },
+    {
+      "suit": "spade",
+      "rank": 4,
+      "x": 1435,
+      "y": 584,
+      "angle": -50,
+      "covers": [
+        1,
+        7
+      ]
+    },
+    {
+      "suit": "spade",
+      "rank": 6,
+      "x": 1161,
+      "y": 579,
+      "angle": -50,
+      "covers": [
+        2,
+        8
+      ]
+    },
+    {
+      "suit": "heart",
+      "rank": 7,
+      "x": 894,
+      "y": 581,
+      "angle": 40,
+      "covers": [
+        3,
+        9
+      ]
+    },
+    {
+      "suit": "diamond",
+      "rank": 8,
+      "x": 628,
+      "y": 569,
+      "angle": 40,
+      "covers": [
+        10
+      ]
+    },
+    {
+      "suit": "club",
+      "rank": 9,
+      "x": 332,
+      "y": 578,
+      "angle": 40,
+      "covers": [
+        11
+      ]
+    },
+    {
+      "suit": "club",
+      "rank": 1,
+      "x": 331,
+      "y": 533,
+      "angle": -50,
+      "covers": [
+        11,
+        17
+      ]
+    },
+    {
+      "suit": "heart",
+      "rank": 13,
+      "x": 626,
+      "y": 523,
+      "angle": -50,
+      "covers": [
+        10,
+        16
+      ]
+    },
+    {
+      "suit": "club",
+      "rank": 5,
+      "x": 900,
+      "y": 532,
+      "angle": -50,
+      "covers": [
+        9,
+        15
+      ]
+    },
+    {
+      "suit": "spade",
+      "rank": 2,
+      "x": 1158,
+      "y": 530,
+      "angle": 40,
+      "covers": [
+        14
+      ]
+    },
+    {
+      "suit": "diamond",
+      "rank": 3,
+      "x": 1429,
+      "y": 538,
+      "angle": 40,
+      "covers": [
+        7,
+        13
+      ]
+    },
+    {
+      "suit": "club",
+      "rank": 12,
+      "x": 1684,
+      "y": 536,
+      "angle": 40,
+      "covers": [
+        6,
+        12
+      ]
+    }
+  ]
+}

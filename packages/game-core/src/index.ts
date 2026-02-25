@@ -1,15 +1,15 @@
 // Main Game class
 export * from "./Game.js";
 
-// Layout system
-export * from "./LayoutSystem.js";
+// Layout manager
+export * from "./managers/LayoutManager.js";
 
 // Audio manager
-export * from "./AudioManager.js";
+export * from "./managers/AudioManager.js";
 
 // Scene system
+export * from "./managers/SceneManager.js";
 export * from "./Scene.js";
-export * from "./SceneManager.js";
 
 // Scenes
 export * from "./scenes/LoadingScene.js";

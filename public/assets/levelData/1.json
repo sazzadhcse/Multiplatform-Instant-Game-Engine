@@ -1,0 +1,26 @@
+{
+  "id": "level_1",
+  "wasteCard": { "suit": "spade", "rank": 2 },
+  "stockPile": [
+    { "suit": "diamond", "rank": 2 },
+    { "suit": "club", "rank": 5 },
+    { "suit": "heart", "rank": 3 },
+    { "suit": "heart", "rank": 7 }
+  ],
+  "layout": [
+    { "suit": "club", "rank": 12, "x": 780, "y": 250, "angle": 0 },
+    { "suit": "diamond", "rank": 1, "x": 960, "y": 180, "angle": 0 },
+    { "suit": "diamond", "rank": 13, "x": 1140, "y": 250, "angle": 0 },
+    { "suit": "spade", "rank": 11, "x": 960, "y": 550, "angle": 0 },
+    { "suit": "spade", "rank": 6, "x": 800, "y": 400, "angle": -15, "covers": [0] },
+    { "suit": "heart", "rank": 8, "x": 960, "y": 400, "angle": 0, "covers": [] },
+    { "suit": "club", "rank": 7, "x": 1120, "y": 400, "angle": 15, "covers": [2] },
+    { "suit": "club", "rank": 4, "x": 860, "y": 280, "angle": -15, "covers": [1, 4, 5] },
+    { "suit": "diamond", "rank": 5, "x": 1060, "y": 280, "angle": 15, "covers": [1, 5, 6] },
+    { "suit": "spade", "rank": 9, "x": 720, "y": 650, "angle": 0, "covers": [] },
+    { "suit": "diamond", "rank": 10, "x": 880, "y": 650, "angle": 0, "covers": [3] },
+    { "suit": "club", "rank": 10, "x": 1040, "y": 650, "angle": 0, "covers": [3] },
+    { "suit": "heart", "rank": 9, "x": 1200, "y": 650, "angle": 0, "covers": [] },
+    { "suit": "heart", "rank": 3, "x": 960, "y": 220, "angle": 0, "covers": [7, 8] }
+  ]
+}

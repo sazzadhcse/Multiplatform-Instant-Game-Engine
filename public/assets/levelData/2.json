@@ -1,0 +1,32 @@
+{
+  "id": "level_lakeside",
+  "wasteCard": { "suit": "spade", "rank": 2 },
+  "stockPile": [
+    { "suit": "heart", "rank": 10 },
+    { "suit": "club", "rank": 9 },
+    { "suit": "diamond", "rank": 4 },
+    { "suit": "spade", "rank": 8 },
+    { "suit": "heart", "rank": 7 },
+    { "suit": "club", "rank": 5 },
+    { "suit": "diamond", "rank": 9 },
+    { "suit": "heart", "rank": 13 },
+    { "suit": "diamond", "rank": 2 },
+    { "suit": "spade", "rank": 10 },
+    { "suit": "heart", "rank": 6 },
+    { "suit": "club", "rank": 13 }
+  ],
+  "layout": [
+    { "suit": "spade", "rank": 11, "x": 810, "y": 600, "angle": -10 },
+    { "suit": "club", "rank": 13, "x": 960, "y": 590, "angle": 0 },
+    { "suit": "diamond", "rank": 12, "x": 1110, "y": 600, "angle": 10 },
+    { "suit": "heart", "rank": 1, "x": 910, "y": 520, "angle": -5, "covers": [0, 1] },
+    { "suit": "club", "rank": 2, "x": 1010, "y": 520, "angle": 5, "covers": [2] },
+    { "suit": "diamond", "rank": 7, "x": 630, "y": 450, "angle": 0 },
+    { "suit": "diamond", "rank": 3, "x": 960, "y": 450, "angle": 0, "covers": [4, 3] },
+    { "suit": "diamond", "rank": 8, "x": 1290, "y": 450, "angle": 0 },
+    { "suit": "club", "rank": 3, "x": 710, "y": 250, "angle": 0, "covers": [] },
+    { "suit": "spade", "rank": 5, "x": 880, "y": 250, "angle": 0, "covers": [] },
+    { "suit": "heart", "rank": 6, "x": 1040, "y": 250, "angle": 0, "covers": [] },
+    { "suit": "heart", "rank": 4, "x": 1210, "y": 250, "angle": 0, "covers": [] }
+  ]
+}

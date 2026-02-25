@@ -1,5 +1,5 @@
 import { Container, type Application } from "pixi.js";
-import type { LayoutSystem, SceneLayers } from "./LayoutSystem.js";
+import type { LayoutManager, SceneLayers } from "./managers/LayoutManager.js";
 import type { AudioManager, AudioSettings } from "./AudioManager.js";
 import type { PlatformAPI } from "@repo/shared";
 import type { SceneManager } from "./SceneManager.js";
@@ -16,7 +16,7 @@ export interface GameContext {
   /** Design height (1080) */
   DESIGN_H: number;
   /** Layout system for scaling */
-  layout: LayoutSystem;
+  layout: LayoutManager;
   /** Audio manager */
   audio: AudioManager;
   /** Scene manager - for changing scenes (set after initialization) */
@@ -31,6 +31,7 @@ export interface GameContext {
   progress: {
     lastScore: number;
     highScore: number;
+    currentLevel: number;
   };
   /** Save progress to platform storage */
   saveProgress(): Promise<void>;

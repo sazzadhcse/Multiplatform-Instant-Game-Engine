@@ -1,7 +1,10 @@
 import { Graphics, Text, Container, Sprite, Assets } from "pixi.js";
 import { BaseScene, type GameContext } from "../Scene.js";
 import { MenuScene } from "./MenuScene.js";
-import { DEFAULT_AUDIO_REGISTRY } from "../AudioManager.js";
+import { DEFAULT_AUDIO_REGISTRY } from "../managers/AudioManager.js";
+import { GameplayScene } from "./GameplayScene.js";
+import { LevelEditorScene } from "./LevelEditorScene.js";
+import type { LevelData } from "../entities/Levels.js";
 
 /**
 * LoadingScene - Shows loading progress and transitions to MenuScene
@@ -45,6 +48,24 @@ export class LoadingScene extends BaseScene {
     "assets/images/uiAnchor.png",
     "assets/images/uiTime.png",
     "assets/images/uiPlayBg.png",
+    "assets/images/cardBackBlue.png",
+    "assets/images/cardBackGreen.png",
+    "assets/images/cardBackLife.png",
+    "assets/images/cardPlus2Green.png",
+    "assets/images/cardPlus2Blue.png",
+    "assets/images/cardJokerRed.png",
+    "assets/images/cardJokerBlack.png",
+    "assets/images/parrot.png",
+    "assets/images/uiBack.png",
+    "assets/images/uiSteak.png",
+    "assets/images/uiSteakFillRed.png",
+    "assets/images/uiSteakFillGreen.png",
+    "assets/images/coin.png",
+    "assets/images/uiBtnBig.png",
+    "assets/images/hat.png",
+    "assets/images/hatSlot.png",
+    "assets/images/dialog.png",
+    "assets/images/map1.png",
   ];
   
   // Audio assets are loaded via AudioManager from DEFAULT_AUDIO_REGISTRY
@@ -74,8 +95,11 @@ export class LoadingScene extends BaseScene {
     this.createLoadingUI(layers.uiLayer);
     
     
-    for (let i = 0; i < 3; i++) {
-      this.imageAssets.push(`assets/images/heart${i + 1}.png`); 
+    for (let i = 0; i < 13; i++) {
+      this.imageAssets.push(`assets/images/heart${i + 1}.png`); // 1==A, 11==J, 12==Q, 13==K
+      this.imageAssets.push(`assets/images/diamond${i + 1}.png`); 
+      this.imageAssets.push(`assets/images/club${i + 1}.png`); 
+      this.imageAssets.push(`assets/images/spade${i + 1}.png`); 
     }
     
     
@@ -299,7 +323,17 @@ export class LoadingScene extends BaseScene {
       
       // Transition to MenuScene
       this.changeScene(new MenuScene(this.context));
+      // this.changeScene(new GameplayScene(this.context));
+      // this.changeScene(new LevelEditorScene(this.context));
+      // this.gotoLevel(3);
+      // this.gotoLevel(5);
     }
+  }
+
+  async gotoLevel(currentLevel: number): Promise<void> {
+          const levelData: LevelData = await Assets.load(`assets/levelData/${currentLevel}.json`);
+          // Pass the loaded JSON directly into the GameplayScene
+          this.changeScene(new GameplayScene(this.context, levelData)); 
   }
   
   exit(): void {

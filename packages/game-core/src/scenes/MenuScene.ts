@@ -1,6 +1,9 @@
 import { Graphics, Text, Container, FederatedPointerEvent, Sprite, Assets, MeshSimple, Texture, Point, MeshRope } from "pixi.js";
 import { BaseScene, type GameContext } from "../Scene.js";
 import { GameplayScene } from "./GameplayScene.js";
+import type { LevelData } from "../entities/Levels.js";
+import { DialogManager } from "../managers/DialogManager.js";
+import { MapSystem } from "../entities/Maps.js";
 
 /**
 * Button state for visual feedback
@@ -55,6 +58,9 @@ export class MenuScene extends BaseScene {
   // Trackers
   private animCount = 0;
   
+  private dialogManager: DialogManager;
+  private mapSystem = new MapSystem();
+  
   constructor(context: GameContext) {
     super("MenuScene", context);
     this.playButton = new Graphics();
@@ -72,6 +78,8 @@ export class MenuScene extends BaseScene {
     this.musicSliderText = new Text();
     this.sfxSliderText = new Text();
     this.highScoreText = new Text();
+
+    this.dialogManager = new DialogManager();
   }
   
   async create(): Promise<void> {
@@ -244,7 +252,7 @@ export class MenuScene extends BaseScene {
       fill: 0xffffff,
       fontSize: 20,
       fontWeight: "bold",
-      stroke: { color: 0x000000, width: 4 },
+      // stroke: { color: 0x000000, width: 4 },
       dropShadow: { color: 0x000000, alpha: 0.5, blur: 2, distance: 2 },
     };
 
@@ -253,7 +261,7 @@ export class MenuScene extends BaseScene {
     uiCoinBg.anchor.set(0.5);
     uiCoinBg.position.set(200, 100);
     uiLayer.addChild(uiCoinBg);
-    this.addLabel(uiCoinBg, "1,250", { ...labelStyle, fill: 0xffd700, fontSize: 34 }, 30, -5);
+    this.addLabel(uiCoinBg, "1250", { ...labelStyle, fontSize: 34 }, 30, -5);
 
     // 2. ANCHOR EVENT (uiAnchor)
     const uiAnchor = Sprite.from('assets/images/uiAnchor.png');
@@ -297,17 +305,77 @@ export class MenuScene extends BaseScene {
     uiLayer.addChild(uiMap);
     this.makeInteractive(uiMap, () => console.log("Map Clicked"));
 
+    this.makeInteractive(uiMap, () => {
+        
+        // Open the dialog
+        this.dialogManager.showMapExploration(
+            this.getLayers().uiLayer,
+            this.mapSystem,
+            5000, // Your coin count
+            (cost) => {
+                // This callback runs AFTER the visual reveal is done
+                
+                // 1. Deduct Coins
+                // this.context.progress.coins -= cost;
+                
+                // 2. Update Logic
+                const nextZone = this.mapSystem.getNextLockedZone();
+                if (nextZone) {
+                    this.mapSystem.unlockZone(nextZone.id);
+                }
+
+                // 3. Save
+                this.context.saveProgress(); // Ensure you save the unlock state!
+                
+                // 4. Refresh UI (Update coin display, etc)
+                // this.updateCoinDisplay(); 
+            }
+        );
+    });
+
+    // Determine current level (default to 1 if not set)
+  const currentLevel = this.context.progress?.currentLevel || 1;
+
     // 8. PLAY BUTTON (uiPlayBg) - Interactive
     const uiPlayBg = Sprite.from('assets/images/uiPlayBg.png');
     uiPlayBg.anchor.set(0.5);
     uiPlayBg.position.set(960, 900);
     uiLayer.addChild(uiPlayBg);
     // Add Level Number (e.g., 19)
-    this.addLabel(uiPlayBg, "19", { ...labelStyle, fontSize: 48 }, -5);
-    this.makeInteractive(uiPlayBg, () => {
+    this.addLabel(uiPlayBg, `${currentLevel}`, { ...labelStyle, fontSize: 48 }, -5);
+    this.makeInteractive(uiPlayBg, async () => {
        this.context.audio.playSfx("sfx_click");
-       this.changeScene(new GameplayScene(this.context)); 
+      uiPlayBg.eventMode = "none";
+      this.dialogManager.showLevelStart(
+         this.getLayers().uiLayer, // The layer to draw the dialog on
+         currentLevel,             // Level Number
+         1000,                     // Coin Cost
+         () => {
+           // What happens when they click "Play" on the modal
+           // this.changeScene(new GameplayScene(this.context)); 
+           this.loadAndPlayLevel(currentLevel);
+           console.log("Transitioning to gameplay!");
+         }
+       );
     });
+  }
+
+  private async loadAndPlayLevel(levelNumber: number): Promise<void> {
+
+      //  this.changeScene(new GameplayScene(this.context)); 
+       try {
+      // Prevent multiple clicks while loading
+      
+      // Load the specific JSON file
+      const levelData: LevelData = await Assets.load(`assets/levelData/${levelNumber}.json`);
+      
+      // Pass the loaded JSON directly into the GameplayScene
+      this.changeScene(new GameplayScene(this.context, levelData)); 
+    } catch (error) {
+      console.error(`Failed to load level ${levelNumber}.json:`, error);
+      // Optional: Reset to level 1 if they beat the last level
+      // uiPlayBg.eventMode = "static"; 
+    }
   }
 
   /**
